@@ -1,0 +1,18 @@
+cat > requirements.txt <<'EOF'
+transformers
+transformer-lens
+datasets
+einops
+jaxtyping
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+plotly
+tqdm
+ipykernel
+jupyterlab
+huggingface-hub
+safetensors
+EOF
