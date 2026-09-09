@@ -1,25 +1,24 @@
 import torch
 
-print("=" * 50)
+print("=" * 60)
 print("MECH-INTERP GPU CHECK")
-print("=" * 50)
+print("=" * 60)
 
-print(f"PyTorch: {torch.__version__}")
-print(f"CUDA available: {torch.cuda.is_available()}")
+print("PyTorch:", torch.__version__)
+print("CUDA available:", torch.cuda.is_available())
 
-if torch.cuda.is_available():
-    print(f"CUDA version: {torch.version.cuda}")
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
+if not torch.cuda.is_available():
+    raise SystemExit("ERROR: CUDA GPU not detected.")
 
-    props = torch.cuda.get_device_properties(0)
+print("CUDA:", torch.version.cuda)
+print("GPU:", torch.cuda.get_device_name(0))
 
-    print(f"VRAM: {props.total_memory / 1024**3:.2f} GB")
+props = torch.cuda.get_device_properties(0)
 
-    x = torch.randn(2000, 2000, device="cuda")
-    y = x @ x
+print(f"VRAM: {props.total_memory / 1024**3:.2f} GB")
 
-    print(f"GPU tensor test: {y.device}")
-    print("GPU computation successful ✓")
+x = torch.randn((2048, 2048), device="cuda")
+y = x @ x
 
-else:
-    print("No CUDA GPU detected.")
+print("GPU tensor:", y.device)
+print("GPU computation: SUCCESS")

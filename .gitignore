@@ -1,7 +1,9 @@
+cat > .gitignore <<'EOF'
 # Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
 
 # Secrets
 .env
@@ -11,20 +13,33 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
-# Models / large ML files
+# Model weights
 *.pt
 *.pth
 *.ckpt
 *.safetensors
+*.bin
 
-# HuggingFace cache
+# Hugging Face/model cache
 .cache/
 huggingface/
 
-# Experiment artifacts
+# Large mech-interp artifacts
 activations/
 results/raw/
+results/data/*
+!results/data/.gitkeep
 
-# IDE / OS
+# Logs
+results/logs/*
+!results/logs/.gitkeep
+
+# IDE
 .vscode/
+
+# OS
 .DS_Store
+EOF
+
+touch results/data/.gitkeep
+touch results/logs/.gitkeep

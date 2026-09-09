@@ -2,6 +2,7 @@ cat > requirements.txt <<'EOF'
 transformers
 transformer-lens
 datasets
+accelerate
 einops
 jaxtyping
 numpy
@@ -15,4 +16,7 @@ ipykernel
 jupyterlab
 huggingface-hub
 safetensors
+python-dotenv
+pyyaml
+psutil
 EOF

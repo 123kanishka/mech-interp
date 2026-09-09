@@ -1,38 +1,46 @@
 #!/usr/bin/env bash
-set -e
-
-echo "======================================"
-echo " Bootstrapping Vast mech-interp setup"
-echo "======================================"
+set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Reuse the PyTorch/CUDA packages from Vast's base environment.
+echo "=========================================="
+echo " VAST MECH-INTERP BOOTSTRAP"
+echo "=========================================="
+
+echo
+echo "[1/5] Checking NVIDIA GPU..."
+nvidia-smi
+
+echo
+echo "[2/5] Creating Python environment..."
+
 if [ ! -d ".venv" ]; then
     python3 -m venv --system-site-packages .venv
 fi
 
 source .venv/bin/activate
 
+echo
+echo "[3/5] Installing dependencies..."
+
 python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 
 echo
-echo "Installing research dependencies..."
-pip install -r requirements.txt
+echo "[4/5] Preparing caches..."
 
-# Keep Hugging Face downloads in one predictable location.
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
+export TRANSFORMERS_CACHE="${HF_HOME}/hub"
+
 mkdir -p "$HF_HOME"
 
 echo
-echo "Checking GPU..."
-python scripts/check_gpu.py
+echo "[5/5] Running checks..."
 
-echo
-echo "Checking mech-interp packages..."
+python scripts/check_gpu.py
 python scripts/check_environment.py
 
 echo
-echo "======================================"
-echo " Vast environment is ready."
-echo "======================================"
+echo "=========================================="
+echo " VAST ENVIRONMENT READY"
+echo "=========================================="
