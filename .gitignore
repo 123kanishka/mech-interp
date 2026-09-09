@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Models / large ML files
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# HuggingFace cache
+.cache/
+huggingface/
+
+# Experiment artifacts
+activations/
+results/raw/
+
+# IDE / OS
+.vscode/
+.DS_Store
