@@ -45,6 +45,42 @@ def top_k_overlap(p: np.ndarray, q: np.ndarray, k: int) -> float:
     return len(a & b) / k
 
 
+def weighted_jaccard_similarity(p: np.ndarray, q: np.ndarray) -> float:
+    """Probability-mass overlap; sensitive to both labels and their weights."""
+    p = _normalise(p)
+    q = _normalise(q)
+    return float(np.minimum(p, q).sum() / np.maximum(p, q).sum())
+
+
+def ranked_future_metrics(
+    ranked_token_ids: Iterable[int], future_token_ids: Iterable[int], k: int
+) -> dict[str, float]:
+    """Evaluate a ranked token set against tokens observed in the future window."""
+    k = int(k)
+    if k <= 0:
+        raise ValueError("k must be positive")
+    # Repeated feature labels do not receive repeated credit.
+    ranked = list(dict.fromkeys(int(token) for token in ranked_token_ids))[:k]
+    relevant = set(int(token) for token in future_token_ids)
+    if not relevant:
+        raise ValueError("future token set cannot be empty")
+    hits = [1.0 if token in relevant else 0.0 for token in ranked]
+    hit_count = sum(hits)
+    reciprocal_rank_value = next(
+        (1.0 / rank for rank, hit in enumerate(hits, start=1) if hit), 0.0
+    )
+    dcg = sum(hit / math.log2(rank + 1.0) for rank, hit in enumerate(hits, start=1))
+    ideal_hits = min(k, len(relevant))
+    idcg = sum(1.0 / math.log2(rank + 1.0) for rank in range(1, ideal_hits + 1))
+    return {
+        "future_hit_at_k": float(hit_count > 0),
+        "future_precision_at_k": float(hit_count / k),
+        "future_recall_at_k": float(hit_count / len(relevant)),
+        "future_mrr_at_k": float(reciprocal_rank_value),
+        "future_ndcg_at_k": float(dcg / idcg if idcg else 0.0),
+    }
+
+
 def rank_biased_overlap(
     p: np.ndarray, q: np.ndarray, k: int, persistence: float
 ) -> float:

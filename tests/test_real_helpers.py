@@ -5,7 +5,7 @@ import yaml
 from sae_jlens.real import (
     _completed_sequence_ids,
     _estimate_unigram,
-    _independent_readouts,
+    _feature_token_distributions,
     _shuffle_dataset,
 )
 
@@ -53,28 +53,21 @@ class RealHelpersTest(unittest.TestCase):
         self.assertIs(_shuffle_dataset(streaming, seed=43, streaming=True), streaming)
         self.assertEqual(streaming.kwargs, {"seed": 43, "buffer_size": 10_000})
 
-    def test_sae_readout_does_not_use_jlens(self):
+    def test_feature_token_distribution_uses_top_feature_labels(self):
         import torch
 
         class Model:
             def unembed(self, value):
                 return value
 
-        class Lens:
-            def transport(self, value, _layer):
-                return value + 100
-
-        residual = torch.tensor([[1.0, 2.0]])
-        reconstruction = torch.tensor([[3.0, 4.0]])
-        readouts = _independent_readouts(
+        distributions, metadata = _feature_token_distributions(
+            torch.tensor([[3.0, 1.0, 0.0]]),
+            torch.tensor([[2.0, 0.0], [0.0, 4.0], [-1.0, 0.0]]),
             Model(),
-            Lens(),
-            3,
-            residual,
-            reconstruction,
-            reconstruction + 1,
-            reconstruction + 2,
-            torch.tensor([[9.0, 9.0]]),
+            k=2,
+            vocab_size=2,
         )
-        self.assertTrue(torch.equal(readouts["jlens"], residual + 100))
-        self.assertTrue(torch.equal(readouts["sae_reconstruction"], reconstruction))
+        self.assertEqual(metadata[0]["active_feature_ids"], [0, 1])
+        self.assertEqual(metadata[0]["feature_token_ids"], [0, 1])
+        self.assertAlmostEqual(float(distributions[0][0]), 0.75)
+        self.assertAlmostEqual(float(distributions[0][1]), 0.25)

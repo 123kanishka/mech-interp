@@ -6,8 +6,10 @@ from sae_jlens.metrics import (
     compare_distributions,
     frequency_adjust_logits,
     jensen_shannon_similarity,
+    ranked_future_metrics,
     rank_biased_overlap,
     reconstruction_quality,
+    weighted_jaccard_similarity,
 )
 
 
@@ -42,6 +44,18 @@ class MetricsTest(unittest.TestCase):
         quality = reconstruction_quality(np.array([1.0, 2.0]), np.array([1.0, 2.0]))
         self.assertAlmostEqual(quality["normalised_mse"], 0.0)
         self.assertAlmostEqual(quality["reconstruction_cosine"], 1.0)
+
+    def test_weighted_jaccard_uses_probability_mass(self):
+        p = np.array([0.75, 0.25, 0.0])
+        q = np.array([0.25, 0.75, 0.0])
+        self.assertAlmostEqual(weighted_jaccard_similarity(p, q), 1.0 / 3.0)
+
+    def test_ranked_future_metrics_deduplicate_feature_labels(self):
+        result = ranked_future_metrics([8, 8, 3, 9], [3, 4], k=3)
+        self.assertEqual(result["future_hit_at_k"], 1.0)
+        self.assertAlmostEqual(result["future_precision_at_k"], 1.0 / 3.0)
+        self.assertAlmostEqual(result["future_recall_at_k"], 0.5)
+        self.assertAlmostEqual(result["future_mrr_at_k"], 0.5)
 
 
 if __name__ == "__main__":

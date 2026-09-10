@@ -4,7 +4,7 @@
 
 For residual-stream activations at matched layers, independently construct a
 J-Lens vocabulary distribution and an SAE vocabulary distribution, then
-compare them with each other and with the observed next token. Neither method
+compare them with each other and with the observed future-token window. Neither method
 is used to construct the other's distribution.
 
 This design does **not** claim that SAE features literally are tokens. SAE
@@ -14,20 +14,25 @@ fixed direct-unembedding rule. The percentage failing that rule is reported.
 
 ## Units and distributions
 
-- Unit of analysis: a non-special source token position with its observed next
-  token as target.
-- J-Lens distribution: `softmax(unembed(J_l h_l))`.
-- SAE distribution: `softmax(unembed(SAE_l(h_l)))`.
-- Direct-logit baseline: `softmax(unembed(h_l))`.
-- Model distribution: the model's ordinary logits at that source position.
-- Frequency-adjusted variants subtract `alpha * log(unigram_probability)`
-  before softmax. Raw and adjusted results are both retained.
+- Unit of analysis: a source-token position and its next 10 observed corpus tokens.
+- SAE feature-token distribution: select the 10 strongest positive SAE features;
+  independently label each feature with the argmax token obtained by directly
+  unembedding its normalized decoder direction; sum duplicate labels and weight
+  labels by normalized feature activation.
+- J-Lens distribution: compute `softmax(unembed(J_l h_l))`, retain its 10 highest
+  probability tokens, and renormalize their probability mass.
+- The primary comparison is therefore 10 fired SAE features/labels versus 10
+  J-Lens poised-to-verbalize tokens at the same activation.
+- SAE-reconstruction and final-model distributions are retained as secondary controls.
 
 ## Primary outcomes
 
-1. Jensen-Shannon similarity between the independent J-Lens and SAE distributions.
-2. Change by layer in target-token negative log likelihood and reciprocal rank.
-3. Rank-biased overlap and top-k overlap.
+1. Weighted Jaccard and Jensen-Shannon similarity between sparse SAE-feature and
+   top-10 J-Lens probability mass.
+2. Rank-biased overlap between the two ranked token lists.
+3. Future-token NDCG@10, recall@10, precision@10, hit@10, reciprocal rank, and
+   total probability mass for both methods against the next 10 observed tokens.
+4. Every outcome is reported at layers 3, 15, and 27 and pooled across all three.
 
 Secondary outcomes include reconstruction cosine similarity, normalized MSE,
 explained variance, active feature count, token-associated feature fraction,
@@ -35,12 +40,10 @@ and agreement with the model distribution.
 
 ## Controls
 
-- Feature-activation permutation within each evaluated batch.
-- Random isotropic residual matched to the SAE reconstruction norm.
-- Direct logit lens.
-- Full model logits.
-- Raw versus unigram-adjusted vocabulary distributions.
-- Stratification by target-token frequency and source position.
+- Permutation of token labels across the fired features while retaining weights.
+- Random vocabulary labels with the same feature weights.
+- Full SAE-reconstruction distribution as a secondary construct-validity control.
+- Full model logits as an upper/behavioral reference.
 
 Random controls use the manifest seed and are stored beside real observations.
 
@@ -52,11 +55,12 @@ The WikiText run is a matched-domain replication/characterization, not an
 independent generalization result. The full GPU configuration will add a
 second corpus after the preflight confirms its license and text schema.
 
-Feature token association is descriptive, not the primary metric. It is
-computed by passing normalized SAE decoder directions through the model's
-ordinary final norm and unembedding; J-Lens is never involved. The primary
-SAE result uses the complete SAE reconstruction, with random, permuted, and
-direct-logit controls.
+Feature token association is the primary SAE construct. It is computed by
+passing each normalized SAE decoder direction through the model's ordinary
+final norm and unembedding; J-Lens is never involved. J-Lens independently
+operates on the original activation. The published compatible Qwen3.5-4B SAE
+release contains only layers 3, 15, and 27, so these are all available matched
+layers rather than all transformer blocks.
 
 ## Execution gates
 

@@ -22,3 +22,7 @@ class AnalysisTest(unittest.TestCase):
         ]
         self.assertEqual(len(js_rows), 3)
         self.assertTrue(all(row["n_sequences"] == 12 for row in js_rows))
+        self.assertTrue(summary["all_layers_estimates"])
+        self.assertTrue(
+            all(row["layer"] == "all" for row in summary["all_layers_estimates"])
+        )

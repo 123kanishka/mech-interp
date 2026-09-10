@@ -10,7 +10,11 @@ from typing import Any, Callable
 
 import numpy as np
 
-from .metrics import compare_distributions, softmax
+from .metrics import (
+    compare_distributions,
+    ranked_future_metrics,
+    weighted_jaccard_similarity,
+)
 from .run_io import append_jsonl, atomic_json
 
 
@@ -87,6 +91,11 @@ def collect_real_records(
         if stage == "preflight"
         else int(config["dataset"]["full_sequences_per_corpus"])
     )
+    sequence_length = (
+        int(config["dataset"]["preflight_sequence_length"])
+        if stage == "preflight"
+        else int(config["dataset"]["sequence_length"])
+    )
     prompts_path = run_dir / "prompts.jsonl"
     if prompts_path.exists():
         import json
@@ -107,14 +116,12 @@ def collect_real_records(
                 streaming=bool(corpus.get("streaming", False)),
             )
             prompt_rows.extend(
-                _take_tokenizable_texts(ds, corpus, tokenizer, config, count)
+                _take_tokenizable_texts(
+                    ds, corpus, tokenizer, config, count, sequence_length
+                )
             )
         for row in prompt_rows:
             append_jsonl(prompts_path, row)
-
-    vocab_size = int(hf_model.config.get_text_config().vocab_size)
-    unigram = _estimate_unigram(prompt_rows, tokenizer, config, vocab_size)
-    np.save(run_dir / "sample_unigram_probabilities.npy", unigram)
 
     records: list[dict[str, Any]] = []
     feature_ids = {layer: set() for layer in layers}
@@ -146,7 +153,7 @@ def collect_real_records(
             layers,
             config,
             ActivationRecorder,
-            unigram,
+            sequence_length,
             feature_ids,
             residual_norms,
         )
@@ -214,10 +221,11 @@ def _completed_sequence_ids(records: list[dict], config: dict) -> set[int]:
     return {sequence_id for sequence_id, count in counts.items() if count >= expected}
 
 
-def _take_tokenizable_texts(ds, corpus, tokenizer, config, count: int) -> list[dict]:
+def _take_tokenizable_texts(
+    ds, corpus, tokenizer, config, count: int, max_tokens: int
+) -> list[dict]:
     rows = []
     min_tokens = int(config["dataset"]["min_non_special_tokens"])
-    max_tokens = int(config["dataset"]["sequence_length"])
     for item in ds:
         text = str(item.get(corpus["text_field"], "")).strip()
         if not text:
@@ -250,7 +258,7 @@ def _score_sequence(
     layers,
     config,
     activation_recorder_cls,
-    unigram,
+    sequence_length_limit,
     feature_ids,
     residual_norms,
 ) -> list[dict]:
@@ -260,10 +268,11 @@ def _score_sequence(
         prompt_row["text"],
         return_tensors="pt",
         truncation=True,
-        max_length=int(config["dataset"]["sequence_length"]),
+        max_length=int(sequence_length_limit),
     ).input_ids.to(model.input_device)
     sequence_length = input_ids.shape[1]
-    candidate_positions = list(range(0, sequence_length - 1))
+    future_horizon = int(config["analysis"]["future_token_horizon"])
+    candidate_positions = list(range(0, sequence_length - future_horizon))
     position_count = min(
         int(config["analysis"]["positions_per_sequence"]), len(candidate_positions)
     )
@@ -284,7 +293,6 @@ def _score_sequence(
         # apply the wrapper's final norm/unembedding exactly once.
         model_logits = model.unembed(activations[final_layer]).float().cpu()
 
-    target_ids = input_ids[0, torch.tensor(positions, device=input_ids.device) + 1].cpu()
     analysis = config["analysis"]
     records: list[dict] = []
     for layer in layers:
@@ -292,22 +300,20 @@ def _score_sequence(
         with torch.inference_mode():
             feature_acts = saes[layer].encode(residual.to(model_cfg_dtype(saes[layer])))
             reconstruction = saes[layer].decode(feature_acts).float()
-            perm = torch.randperm(feature_acts.shape[0], device=feature_acts.device)
-            perm_reconstruction = saes[layer].decode(feature_acts[perm]).float()
-            random_reconstruction = torch.randn_like(reconstruction)
-            random_reconstruction *= reconstruction.norm(dim=-1, keepdim=True) / random_reconstruction.norm(
-                dim=-1, keepdim=True
-            ).clamp_min(1e-8)
-            distributions = _independent_readouts(
+            feature_distributions, feature_metadata = _feature_token_distributions(
+                feature_acts,
+                saes[layer].W_dec,
                 model,
-                lens,
-                layer,
-                residual,
-                reconstruction,
-                perm_reconstruction,
-                random_reconstruction,
-                model_logits,
+                int(analysis["feature_top_k"]),
+                vocab_size=int(model_logits.shape[-1]),
             )
+            jlens_probabilities = torch.softmax(
+                model.unembed(lens.transport(residual, layer)).float(), dim=-1
+            ).cpu()
+            reconstruction_probabilities = torch.softmax(
+                model.unembed(reconstruction).float(), dim=-1
+            ).cpu()
+            model_probabilities = torch.softmax(model_logits, dim=-1)
 
         reconstruction_cosine = torch.nn.functional.cosine_similarity(
             residual, reconstruction, dim=-1
@@ -317,14 +323,6 @@ def _score_sequence(
             / residual.square().mean(dim=-1).clamp_min(1e-12)
         ).cpu()
         active_counts = (feature_acts > float(config["sae"]["active_threshold"])).sum(-1).cpu()
-        active_by_row = [
-            torch.nonzero(row > float(config["sae"]["active_threshold"]), as_tuple=False)
-            .flatten()
-            .detach()
-            .cpu()
-            .tolist()
-            for row in feature_acts
-        ]
         residual_norms[layer].extend(residual.norm(dim=-1).detach().cpu().tolist())
         audit_cap = int(config["analysis"]["feature_audit_max_features_per_layer"])
         if len(feature_ids[layer]) < audit_cap:
@@ -336,16 +334,52 @@ def _score_sequence(
                 feature_ids[layer] = set(sorted(feature_ids[layer])[:audit_cap])
 
         for row_index, position in enumerate(positions):
-            target = int(target_ids[row_index])
-            row_distributions = {
-                name: logits[row_index] for name, logits in distributions.items()
-            }
-            reference = softmax(row_distributions["jlens"].numpy())
-            alpha = float(analysis["unigram_alpha"])
-            frequency_offset = alpha * np.log(unigram + 1e-12)
-            adjusted_reference = softmax(
-                row_distributions["jlens"].numpy() - frequency_offset
+            future_ids = input_ids[
+                0, position + 1 : position + 1 + future_horizon
+            ].detach().cpu().tolist()
+            target = int(future_ids[0])
+            jlens_distribution, jlens_ranked = _truncate_distribution(
+                jlens_probabilities[row_index].numpy(), int(analysis["jlens_top_k"])
             )
+            feature_info = feature_metadata[row_index]
+            feature_tokens = feature_info["feature_token_ids"]
+            feature_weights = feature_info["feature_weights"]
+            shuffled_distribution = _sparse_token_distribution(
+                list(reversed(feature_tokens)), feature_weights, len(jlens_distribution)
+            )
+            control_rng = np.random.default_rng(
+                int(config["experiment"]["seed"]) * 1_000_003
+                + sequence_id * 10_007
+                + layer * 131
+                + position
+            )
+            random_tokens = control_rng.choice(
+                len(jlens_distribution), size=len(feature_tokens), replace=False
+            ).tolist()
+            random_distribution = _sparse_token_distribution(
+                random_tokens, feature_weights, len(jlens_distribution)
+            )
+            row_distributions = {
+                "sae_feature_tokens": feature_distributions[row_index],
+                "jlens": jlens_distribution,
+                "shuffled_feature_labels_control": shuffled_distribution,
+                "random_feature_labels_control": random_distribution,
+                "sae_reconstruction_control": reconstruction_probabilities[row_index].numpy(),
+                "model_control": model_probabilities[row_index].numpy(),
+            }
+            ranked_tokens = {
+                "sae_feature_tokens": feature_info["feature_token_ids"],
+                "jlens": jlens_ranked,
+                "shuffled_feature_labels_control": list(reversed(feature_tokens)),
+                "random_feature_labels_control": random_tokens,
+                "sae_reconstruction_control": np.argsort(
+                    -row_distributions["sae_reconstruction_control"]
+                )[: int(analysis["feature_top_k"])].tolist(),
+                "model_control": np.argsort(-row_distributions["model_control"])[
+                    : int(analysis["feature_top_k"])
+                ].tolist(),
+            }
+            reference = jlens_distribution
             common = {
                 "sequence_id": sequence_id,
                 "corpus": prompt_row["corpus"],
@@ -353,6 +387,8 @@ def _score_sequence(
                 "position": position,
                 "source_token_id": int(input_ids[0, position]),
                 "target_token_id": target,
+                "future_token_ids": future_ids,
+                "future_tokens": [tokenizer.decode([token]) for token in future_ids],
                 "layer": layer,
                 "reconstruction_cosine": float(reconstruction_cosine[row_index]),
                 "normalised_mse": float(normalised_mse[row_index]),
@@ -361,8 +397,7 @@ def _score_sequence(
             }
             save_top_k = int(analysis["save_top_tokens"])
             ref_top = np.argsort(-reference)[:save_top_k]
-            for control, logits in row_distributions.items():
-                q_distribution = softmax(logits.numpy())
+            for control, q_distribution in row_distributions.items():
                 metrics = compare_distributions(
                     reference,
                     q_distribution,
@@ -370,57 +405,91 @@ def _score_sequence(
                     top_k=int(analysis["top_k"]),
                     rbo_p=float(analysis["rbo_p"]),
                 )
-                adjusted = compare_distributions(
-                    adjusted_reference,
-                    softmax(logits.numpy() - frequency_offset),
-                    target,
-                    top_k=int(analysis["top_k"]),
-                    rbo_p=float(analysis["rbo_p"]),
-                )
                 metrics.update(
                     {
-                        "frequency_adjusted_js_similarity": adjusted["js_similarity"],
-                        "frequency_adjusted_q_target_nll": adjusted["q_target_nll"],
-                        "frequency_adjusted_q_target_rr": adjusted["q_target_rr"],
+                        "weighted_jaccard": weighted_jaccard_similarity(
+                            reference, q_distribution
+                        ),
+                        "future_token_mass": float(
+                            q_distribution[list(set(future_ids))].sum()
+                        ),
                         "reference_top_token_ids": ref_top.tolist(),
                         "reference_top_probabilities": reference[ref_top].tolist(),
                     }
                 )
-                q_top = np.argsort(-q_distribution)[:save_top_k]
+                metrics.update(
+                    ranked_future_metrics(
+                        ranked_tokens[control],
+                        future_ids,
+                        int(analysis["feature_top_k"]),
+                    )
+                )
+                q_top = np.asarray(ranked_tokens[control][:save_top_k], dtype=int)
                 metrics["q_top_token_ids"] = q_top.tolist()
+                metrics["q_top_tokens"] = [
+                    tokenizer.decode([int(token)]) for token in q_top
+                ]
                 metrics["q_top_probabilities"] = q_distribution[q_top].tolist()
                 row = {**common, "control": control, **metrics}
-                if control == "sae_reconstruction":
-                    row["active_feature_ids"] = active_by_row[row_index]
+                if control == "sae_feature_tokens":
+                    row.update(feature_info)
                 records.append(row)
     return records
 
 
-def _independent_readouts(
-    model,
-    lens,
-    layer,
-    residual,
-    reconstruction,
-    perm_reconstruction,
-    random_reconstruction,
-    model_logits,
-):
-    """Construct readouts while enforcing the SAE/J-Lens separation."""
-    return {
-        "jlens": model.unembed(lens.transport(residual, layer)).float().cpu(),
-        "sae_reconstruction": model.unembed(reconstruction).float().cpu(),
-        "feature_permutation": model.unembed(perm_reconstruction).float().cpu(),
-        "random_matched_norm": model.unembed(random_reconstruction).float().cpu(),
-        "direct_logit_lens": model.unembed(residual).float().cpu(),
-        "model": model_logits,
-    }
+def _feature_token_distributions(feature_acts, decoder, model, k: int, vocab_size: int):
+    """Map top fired SAE features independently to tokens, then weight their labels."""
+    import torch
+
+    distributions = []
+    metadata = []
+    for activations in feature_acts:
+        positive = torch.clamp(activations.float(), min=0)
+        active = torch.nonzero(positive > 0, as_tuple=False).flatten()
+        if not active.numel():
+            active = torch.topk(activations.float(), k=1).indices
+            positive = torch.clamp(activations.float(), min=0) + 1e-12
+        count = min(int(k), int(active.numel()))
+        values, order = torch.topk(positive[active], k=count)
+        feature_ids = active[order]
+        weights = values / values.sum().clamp_min(1e-12)
+        directions = decoder[feature_ids].float()
+        directions = directions / directions.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+        feature_logits = model.unembed(directions).float()
+        token_ids = feature_logits.argmax(dim=-1)
+        distribution = torch.zeros(vocab_size, device=token_ids.device, dtype=torch.float32)
+        distribution.scatter_add_(0, token_ids, weights)
+        distributions.append(distribution.cpu().numpy())
+        metadata.append(
+            {
+                "active_feature_ids": feature_ids.detach().cpu().tolist(),
+                "active_feature_values": values.detach().cpu().tolist(),
+                "feature_weights": weights.detach().cpu().tolist(),
+                "feature_token_ids": token_ids.detach().cpu().tolist(),
+            }
+        )
+    return distributions, metadata
+
+
+def _truncate_distribution(probabilities: np.ndarray, k: int):
+    probabilities = np.asarray(probabilities, dtype=np.float64)
+    token_ids = np.argsort(-probabilities)[: int(k)]
+    truncated = np.zeros_like(probabilities)
+    truncated[token_ids] = probabilities[token_ids]
+    truncated /= truncated.sum()
+    return truncated, token_ids.tolist()
+
+
+def _sparse_token_distribution(token_ids, weights, vocab_size: int) -> np.ndarray:
+    distribution = np.zeros(int(vocab_size), dtype=np.float64)
+    np.add.at(distribution, np.asarray(token_ids, dtype=int), np.asarray(weights))
+    return distribution / distribution.sum()
 
 
 def _audit_feature_tokenizability(
     feature_ids, residual_norms, saes, _lens, model, tokenizer, config, run_dir
 ) -> dict:
-    """Audit a bounded sample; this is descriptive because it uses J-Lens."""
+    """Audit a bounded feature sample using direct unembedding only."""
     import torch
 
     top_k = int(config["analysis"]["feature_label_top_k"])

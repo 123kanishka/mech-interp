@@ -15,13 +15,17 @@ METRICS = (
     "js_similarity",
     "top_k_overlap",
     "rbo",
+    "weighted_jaccard",
     "q_target_nll",
     "q_target_rr",
+    "future_token_mass",
+    "future_hit_at_k",
+    "future_precision_at_k",
+    "future_recall_at_k",
+    "future_mrr_at_k",
+    "future_ndcg_at_k",
     "reconstruction_cosine",
     "normalised_mse",
-    "frequency_adjusted_js_similarity",
-    "frequency_adjusted_q_target_nll",
-    "frequency_adjusted_q_target_rr",
 )
 
 
@@ -72,6 +76,37 @@ def summarise_records(records: list[dict], config: dict) -> dict[str, Any]:
                 "ci_high": high,
             }
         )
+    all_layers_per_sequence: dict[tuple, list[float]] = defaultdict(list)
+    for key, values in per_sequence.items():
+        corpus, role, control, _layer, sequence_id, metric = key
+        all_layers_per_sequence[(corpus, role, control, sequence_id, metric)].extend(values)
+    all_layers_grouped: dict[tuple, list[float]] = defaultdict(list)
+    for key, values in all_layers_per_sequence.items():
+        corpus, role, control, _sequence_id, metric = key
+        all_layers_grouped[(corpus, role, control, metric)].append(float(np.mean(values)))
+    all_layers_rows = []
+    offset = len(rows)
+    for index, (key, values) in enumerate(sorted(all_layers_grouped.items())):
+        corpus, role, control, metric = key
+        mean, low, high = bootstrap_mean_ci(
+            values,
+            samples=int(analysis["bootstrap_samples"]),
+            confidence=float(analysis["confidence_level"]),
+            seed=seed + offset + index,
+        )
+        all_layers_rows.append(
+            {
+                "corpus": corpus,
+                "corpus_role": role,
+                "control": control,
+                "layer": "all",
+                "metric": metric,
+                "n_sequences": len(values),
+                "mean": mean,
+                "ci_low": low,
+                "ci_high": high,
+            }
+        )
     token_counts: dict[tuple, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for row in records:
         key = (
@@ -103,6 +138,7 @@ def summarise_records(records: list[dict], config: dict) -> dict[str, Any]:
         ),
         "bootstrap_unit": "sequence",
         "estimates": rows,
+        "all_layers_estimates": all_layers_rows,
         "top_token_frequencies": top_token_frequencies,
     }
 
@@ -118,8 +154,9 @@ def save_plots(summary: dict[str, Any], run_dir: Path) -> list[str]:
     outputs = []
     for metric, ylabel in (
         ("js_similarity", "Jensen-Shannon similarity"),
-        ("q_target_nll", "Target-token NLL"),
-        ("q_target_rr", "Target-token reciprocal rank"),
+        ("weighted_jaccard", "Weighted Jaccard similarity"),
+        ("future_ndcg_at_k", "Future-token NDCG@k"),
+        ("future_recall_at_k", "Future-token recall@k"),
     ):
         rows = [row for row in summary["estimates"] if row["metric"] == metric]
         if not rows:
