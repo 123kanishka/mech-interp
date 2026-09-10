@@ -101,7 +101,11 @@ def collect_real_records(
                 split=corpus["split"],
                 streaming=bool(corpus.get("streaming", False)),
             )
-            ds = ds.shuffle(seed=seed + corpus_index, buffer_size=10_000)
+            ds = _shuffle_dataset(
+                ds,
+                seed=seed + corpus_index,
+                streaming=bool(corpus.get("streaming", False)),
+            )
             prompt_rows.extend(
                 _take_tokenizable_texts(ds, corpus, tokenizer, config, count)
             )
@@ -175,6 +179,13 @@ def collect_real_records(
         },
     )
     return records
+
+
+def _shuffle_dataset(dataset, seed: int, streaming: bool):
+    """Use only shuffle arguments supported by the selected dataset mode."""
+    if streaming:
+        return dataset.shuffle(seed=seed, buffer_size=10_000)
+    return dataset.shuffle(seed=seed)
 
 
 def _estimate_unigram(prompt_rows, tokenizer, config, vocab_size: int) -> np.ndarray:

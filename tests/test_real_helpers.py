@@ -6,6 +6,7 @@ from sae_jlens.real import (
     _completed_sequence_ids,
     _estimate_unigram,
     _independent_readouts,
+    _shuffle_dataset,
 )
 
 
@@ -35,6 +36,22 @@ class RealHelpersTest(unittest.TestCase):
         self.assertAlmostEqual(float(probabilities.sum()), 1.0)
         self.assertTrue((probabilities > 0).all())
         self.assertGreater(probabilities[1], probabilities[3])
+
+    def test_shuffle_arguments_match_dataset_mode(self):
+        class Dataset:
+            def __init__(self):
+                self.kwargs = None
+
+            def shuffle(self, **kwargs):
+                self.kwargs = kwargs
+                return self
+
+        in_memory = Dataset()
+        streaming = Dataset()
+        self.assertIs(_shuffle_dataset(in_memory, seed=42, streaming=False), in_memory)
+        self.assertEqual(in_memory.kwargs, {"seed": 42})
+        self.assertIs(_shuffle_dataset(streaming, seed=43, streaming=True), streaming)
+        self.assertEqual(streaming.kwargs, {"seed": 43, "buffer_size": 10_000})
 
     def test_sae_readout_does_not_use_jlens(self):
         import torch
