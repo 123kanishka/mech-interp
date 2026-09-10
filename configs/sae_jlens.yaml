@@ -1,0 +1,60 @@
+experiment:
+  name: sae_jlens_qwen35_4b
+  seed: 42
+  schema_version: 1
+
+model:
+  name: Qwen/Qwen3.5-4B
+  dtype: bfloat16
+  device: cuda
+
+dataset:
+  sequence_length: 128
+  preflight_sequences: 4
+  full_sequences_per_corpus: 512
+  min_non_special_tokens: 32
+  corpora:
+    - name: Salesforce/wikitext
+      subset: wikitext-103-v1
+      split: test
+      text_field: text
+      streaming: false
+      role: matched_domain
+    - name: HuggingFaceFW/fineweb
+      subset: sample-10BT
+      split: train
+      text_field: text
+      streaming: true
+      role: held_out_corpus
+
+jlens:
+  repo: neuronpedia/jacobian-lens
+  filename: qwen3.5-4b/jlens/Salesforce-wikitext/Qwen3.5-4B_jacobian_lens_n1000.pt
+  revision: 6bb49967d3c51a12ccb5beac7146f6f5781f9d06
+
+sae:
+  repo: decoderesearch/qwen-3.5-saes
+  revision: a51c3cb
+  layers: [3, 15, 27]
+  ids:
+    "3": qwen-3.5-4b/btk-mat-layer-3-k-100
+    "15": qwen-3.5-4b/btk-mat-layer-15-k-100
+    "27": qwen-3.5-4b/btk-mat-layer-27-k-100
+  active_threshold: 0.0
+
+analysis:
+  positions_per_sequence: 16
+  top_k: 100
+  rbo_p: 0.95
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  unigram_alpha: 1.0
+  feature_label_top_k: 10
+  feature_label_min_concentration: 0.10
+  feature_audit_max_features_per_layer: 512
+  save_top_tokens: 20
+
+output:
+  root: results/runs
+  checkpoint_every_sequences: 8
+  min_free_gb_before_download: 20

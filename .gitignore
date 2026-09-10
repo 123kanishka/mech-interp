@@ -1,9 +1,7 @@
-cat > .gitignore <<'EOF'
 # Python
 .venv/
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 
 # Secrets
 .env
@@ -12,6 +10,9 @@ __pycache__/
 
 # Jupyter
 .ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Model weights
 *.pt
@@ -29,6 +30,8 @@ activations/
 results/raw/
 results/data/*
 !results/data/.gitkeep
+results/runs/*
+!results/runs/.gitkeep
 
 # Logs
 results/logs/*
@@ -39,7 +42,3 @@ results/logs/*
 
 # OS
 .DS_Store
-EOF
-
-touch results/data/.gitkeep
-touch results/logs/.gitkeep

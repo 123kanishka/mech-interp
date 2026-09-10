@@ -1,15 +1,21 @@
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--local", action="store_true")
+parser.add_argument("--gpu", action="store_true")
+args = parser.parse_args()
+
 packages = [
     "torch",
     "transformers",
-    "transformer_lens",
-    "datasets",
-    "accelerate",
-    "einops",
-    "jaxtyping",
     "numpy",
     "pandas",
     "scipy",
 ]
+
+if args.gpu:
+    packages.extend(["datasets", "sae_lens", "jlens"])
 
 print("=" * 60)
 print("MECH-INTERP ENVIRONMENT CHECK")

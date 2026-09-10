@@ -24,7 +24,7 @@ echo
 echo "[3/5] Installing dependencies..."
 
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-gpu.txt
 
 echo
 echo "[4/5] Preparing caches..."
@@ -38,7 +38,7 @@ echo
 echo "[5/5] Running checks..."
 
 python scripts/check_gpu.py
-python scripts/check_environment.py
+python scripts/check_environment.py --gpu
 
 echo
 echo "=========================================="

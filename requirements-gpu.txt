@@ -1,0 +1,5 @@
+# Install only on the approved GPU instance, after confirming its CUDA PyTorch.
+-r requirements.txt
+datasets>=4.0
+sae-lens==6.50.0
+git+https://github.com/anthropics/jacobian-lens.git@581d398613e5602a5af361e1c34d3a92ea82ba8e

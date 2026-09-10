@@ -1,22 +1,17 @@
-cat > requirements.txt <<'EOF'
-transformers
-transformer-lens
-datasets
-accelerate
-einops
-jaxtyping
-numpy
-pandas
-scipy
-scikit-learn
-matplotlib
-plotly
-tqdm
-ipykernel
-jupyterlab
-huggingface-hub
-safetensors
-python-dotenv
-pyyaml
-psutil
-EOF
+# PyTorch is deliberately omitted: use the CUDA-compatible build supplied by
+# the Vast PyTorch image. The local environment may use a CPU build.
+numpy>=1.23
+pandas>=1.5
+scipy>=1.9
+scikit-learn>=1.1
+matplotlib>=3.6
+pyyaml>=6.0
+psutil>=5.9
+huggingface-hub>=1.0
+transformers>=5.5
+safetensors>=0.4
+
+# Required only for the real GPU stages. Install after explicit approval:
+# datasets>=4.0
+# sae-lens>=6.44.0
+# git+https://github.com/anthropics/jacobian-lens.git@main
