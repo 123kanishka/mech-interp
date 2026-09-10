@@ -44,7 +44,8 @@ dependencies are available. See `docs/EXPERIMENT_DESIGN.md` before running.
 
 ```bash
 # From the laptop, using the host and SSH port shown by Vast:
-./scripts/provision_vast_from_github.sh VAST_HOST VAST_PORT 97e2d98
+./scripts/provision_vast_from_github.sh \
+  VAST_HOST VAST_PORT "$(git rev-parse HEAD)"
 
 # Then add/update the vast-mech SSH alias and connect:
 ssh vast-mech

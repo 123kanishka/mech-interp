@@ -2,18 +2,18 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 HOST PORT [GIT_COMMIT]" >&2
-    echo "Example: $0 203.0.113.10 12345 97e2d98" >&2
+    echo "Usage: $0 HOST PORT GIT_COMMIT" >&2
+    echo "Example: $0 203.0.113.10 12345 \"\$(git rev-parse HEAD)\"" >&2
 }
 
-if [[ $# -lt 2 || $# -gt 3 ]]; then
+if [[ $# -ne 3 ]]; then
     usage
     exit 2
 fi
 
 HOST="$1"
 PORT="$2"
-GIT_COMMIT="${3:-97e2d98f6d1af5679839119c5fa7d54671b3f228}"
+GIT_COMMIT="$3"
 
 if [[ ! "$HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
     echo "Invalid host: $HOST" >&2
