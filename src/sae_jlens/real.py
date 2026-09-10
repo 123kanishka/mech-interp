@@ -344,7 +344,7 @@ def _score_sequence(
             alpha = float(analysis["unigram_alpha"])
             frequency_offset = alpha * np.log(unigram + 1e-12)
             adjusted_reference = softmax(
-                jlens_logits[row_index].numpy() - frequency_offset
+                row_distributions["jlens"].numpy() - frequency_offset
             )
             common = {
                 "sequence_id": sequence_id,
