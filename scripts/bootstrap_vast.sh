@@ -14,8 +14,16 @@ nvidia-smi
 echo
 echo "[2/5] Creating Python environment..."
 
-if [ ! -d ".venv" ]; then
-    python3 -m venv --system-site-packages .venv
+if [[ -x /venv/main/bin/python ]]; then
+    # Vast's PyTorch image keeps its tested CUDA build here. A nested venv does
+    # not inherit packages from this environment and may make pip download a
+    # replacement CUDA stack.
+    if [[ -e .venv && ! -L .venv ]]; then
+        mv .venv ".venv.incompatible.$(date +%Y%m%d_%H%M%S)"
+    fi
+    ln -sfn /venv/main .venv
+elif [[ ! -d .venv ]]; then
+    python3 -m venv .venv
 fi
 
 source .venv/bin/activate
