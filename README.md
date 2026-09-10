@@ -43,15 +43,23 @@ dependencies are available. See `docs/EXPERIMENT_DESIGN.md` before running.
 ## Vast workflow
 
 ```bash
-./scripts/sync_to_vast.sh
+# From the laptop, using the host and SSH port shown by Vast:
+./scripts/provision_vast_from_github.sh VAST_HOST VAST_PORT 97e2d98
+
+# Then add/update the vast-mech SSH alias and connect:
 ssh vast-mech
 cd /workspace/mech-interp
-./scripts/bootstrap_vast.sh
 ./scripts/start_experiment.sh experiments/run_sae_jlens.py \
   --config configs/sae_jlens.yaml --stage preflight
 ./scripts/experiment_status.sh
 ./scripts/sync_from_vast.sh
 ```
+
+`provision_vast_from_github.sh` clones the public GitHub repository and checks
+out the exact tested commit. It installs dependencies but deliberately does
+not download model, SAE, J-Lens, or dataset artifacts; those downloads begin
+only when the preflight is launched. Hugging Face artifacts are cached under
+`/workspace/.cache/huggingface` so their location and disk use are explicit.
 
 Do not launch `full` until the preflight output has been inspected and its
 runtime, peak VRAM, disk use, and projected cost have been recorded.

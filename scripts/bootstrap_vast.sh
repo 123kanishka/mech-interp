@@ -29,10 +29,12 @@ python -m pip install -r requirements-gpu.txt
 echo
 echo "[4/5] Preparing caches..."
 
-export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
+export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
 export TRANSFORMERS_CACHE="${HF_HOME}/hub"
 
 mkdir -p "$HF_HOME"
+
+echo "Hugging Face cache: $HF_HOME"
 
 echo
 echo "[5/5] Running checks..."
