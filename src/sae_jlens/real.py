@@ -194,7 +194,7 @@ def _completed_sequence_ids(records: list[dict], config: dict) -> set[int]:
     expected = (
         int(config["analysis"]["positions_per_sequence"])
         * len(config["sae"]["layers"])
-        * 5
+        * 6
     )
     counts: dict[int, int] = {}
     for row in records:
@@ -281,21 +281,22 @@ def _score_sequence(
         with torch.inference_mode():
             feature_acts = saes[layer].encode(residual.to(model_cfg_dtype(saes[layer])))
             reconstruction = saes[layer].decode(feature_acts).float()
-            jlens_logits = model.unembed(lens.transport(residual, layer)).float().cpu()
-            sae_logits = model.unembed(lens.transport(reconstruction, layer)).float().cpu()
-            direct_logits = model.unembed(residual).float().cpu()
             perm = torch.randperm(feature_acts.shape[0], device=feature_acts.device)
             perm_reconstruction = saes[layer].decode(feature_acts[perm]).float()
-            perm_logits = model.unembed(
-                lens.transport(perm_reconstruction, layer)
-            ).float().cpu()
             random_reconstruction = torch.randn_like(reconstruction)
             random_reconstruction *= reconstruction.norm(dim=-1, keepdim=True) / random_reconstruction.norm(
                 dim=-1, keepdim=True
             ).clamp_min(1e-8)
-            random_logits = model.unembed(
-                lens.transport(random_reconstruction, layer)
-            ).float().cpu()
+            distributions = _independent_readouts(
+                model,
+                lens,
+                layer,
+                residual,
+                reconstruction,
+                perm_reconstruction,
+                random_reconstruction,
+                model_logits,
+            )
 
         reconstruction_cosine = torch.nn.functional.cosine_similarity(
             residual, reconstruction, dim=-1
@@ -325,14 +326,10 @@ def _score_sequence(
 
         for row_index, position in enumerate(positions):
             target = int(target_ids[row_index])
-            distributions = {
-                "sae_reconstruction": sae_logits[row_index],
-                "feature_permutation": perm_logits[row_index],
-                "random_matched_norm": random_logits[row_index],
-                "direct_logit_lens": direct_logits[row_index],
-                "model": model_logits[row_index],
+            row_distributions = {
+                name: logits[row_index] for name, logits in distributions.items()
             }
-            reference = softmax(jlens_logits[row_index].numpy())
+            reference = softmax(row_distributions["jlens"].numpy())
             alpha = float(analysis["unigram_alpha"])
             frequency_offset = alpha * np.log(unigram + 1e-12)
             adjusted_reference = softmax(
@@ -353,7 +350,7 @@ def _score_sequence(
             }
             save_top_k = int(analysis["save_top_tokens"])
             ref_top = np.argsort(-reference)[:save_top_k]
-            for control, logits in distributions.items():
+            for control, logits in row_distributions.items():
                 q_distribution = softmax(logits.numpy())
                 metrics = compare_distributions(
                     reference,
@@ -388,8 +385,29 @@ def _score_sequence(
     return records
 
 
+def _independent_readouts(
+    model,
+    lens,
+    layer,
+    residual,
+    reconstruction,
+    perm_reconstruction,
+    random_reconstruction,
+    model_logits,
+):
+    """Construct readouts while enforcing the SAE/J-Lens separation."""
+    return {
+        "jlens": model.unembed(lens.transport(residual, layer)).float().cpu(),
+        "sae_reconstruction": model.unembed(reconstruction).float().cpu(),
+        "feature_permutation": model.unembed(perm_reconstruction).float().cpu(),
+        "random_matched_norm": model.unembed(random_reconstruction).float().cpu(),
+        "direct_logit_lens": model.unembed(residual).float().cpu(),
+        "model": model_logits,
+    }
+
+
 def _audit_feature_tokenizability(
-    feature_ids, residual_norms, saes, lens, model, tokenizer, config, run_dir
+    feature_ids, residual_norms, saes, _lens, model, tokenizer, config, run_dir
 ) -> dict:
     """Audit a bounded sample; this is descriptive because it uses J-Lens."""
     import torch
@@ -405,7 +423,8 @@ def _audit_feature_tokenizability(
             with torch.inference_mode():
                 direction = decoder[feature_id].float()
                 direction = direction * scale / direction.norm().clamp_min(1e-8)
-                logits = model.unembed(lens.transport(direction[None], layer))[0].float()
+                # Independent feature label: ordinary unembedding only.
+                logits = model.unembed(direction[None])[0].float()
                 probabilities = torch.softmax(logits, dim=-1)
                 values, indices = probabilities.topk(top_k)
             concentration = float(values.sum().cpu())
@@ -426,7 +445,7 @@ def _audit_feature_tokenizability(
             "non_tokenizable_percent": (
                 100.0 * non_tokenizable / len(rows) if rows else None
             ),
-            "definition": f"top-{top_k} J-Lens probability mass < {threshold}",
+            "definition": f"top-{top_k} direct-unembedding probability mass < {threshold}",
         }
     return summary
 

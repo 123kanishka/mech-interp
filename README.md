@@ -6,10 +6,14 @@ next-token predictions.
 
 ## Research question
 
-At matched residual-stream layers and token positions, how closely does the
-vocabulary distribution recovered from an SAE reconstruction match the
-J-Lens distribution from the original activation? Does either distribution
-become more predictive of the actual next token at later layers?
+At matched residual-stream layers and token positions, how closely does an
+independent SAE vocabulary distribution match the independent J-Lens
+distribution? Which distribution is more predictive of the actual next token
+at later layers?
+
+The methods do not feed into one another. J-Lens transports the original
+activation with its fitted Jacobian. SAE encodes and reconstructs the original
+activation, then uses only the model's ordinary final norm and unembedding.
 
 The primary model is `Qwen/Qwen3.5-4B`. Public residual-stream SAEs exist only
 at layers 3, 15, and 27, so SAE comparisons are restricted to those matched
