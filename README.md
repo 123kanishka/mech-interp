@@ -61,7 +61,8 @@ cd /workspace/mech-interp
 out the exact tested commit. It installs dependencies but deliberately does
 not download model, SAE, J-Lens, or dataset artifacts; those downloads begin
 only when the preflight is launched. Hugging Face artifacts are cached under
-`/workspace/.cache/huggingface` so their location and disk use are explicit.
+`/workspace/.hf_home`, matching the Vast base image, so duplicate model caches
+are not created.
 
 Do not launch `full` until the preflight output has been inspected and its
 runtime, peak VRAM, disk use, and projected cost have been recorded.

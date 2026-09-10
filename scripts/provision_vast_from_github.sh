@@ -60,7 +60,7 @@ cd "$REPO"
 git checkout --detach "$GIT_COMMIT"
 test "$(git rev-parse HEAD)" = "$(git rev-parse "$GIT_COMMIT")"
 
-export HF_HOME=/workspace/.cache/huggingface
+export HF_HOME=/workspace/.hf_home
 export TRANSFORMERS_CACHE="$HF_HOME/hub"
 ./scripts/bootstrap_vast.sh
 
