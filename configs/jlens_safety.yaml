@@ -1,0 +1,52 @@
+experiment:
+  name: jlens_safety_qwen35_4b
+  seed: 42
+  schema_version: 2
+model:
+  name: Qwen/Qwen3.5-4B
+  revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+  dtype: bfloat16
+  max_prompt_tokens: 512
+  max_new_tokens: 192
+  enable_thinking: false
+jlens:
+  repo: neuronpedia/jacobian-lens
+  filename: qwen3.5-4b/jlens/Salesforce-wikitext/Qwen3.5-4B_jacobian_lens_n1000.pt
+  revision: 6bb49967d3c51a12ccb5beac7146f6f5781f9d06
+  intervention_layers: [3, 15, 27]
+  observation_layers: [3, 15, 27, 31]
+  dictionary_size: 32
+judge:
+  name: allenai/wildguard
+  revision: cbba4823f3e8020e5a74a5e29bf85072def6f2ff
+  max_new_tokens: 32
+data:
+  xstest_revision: d7bb5bd738c1fcbc36edd83d5e7d1b71a3e2d84d
+  harmbench_revision: 8e1604d1171fe8a48d8febecd22f600e462bdcdd
+  gsm8k_revision: 740312add88f781978c0658806c59bc2815b9866
+  xstest_counts:
+    train: {safe: 50, unsafe: 50}
+    validation: {safe: 25, unsafe: 25}
+    test: {safe: 175, unsafe: 125}
+  harmbench_test: 200
+  gsm8k_validation: 40
+  gsm8k_test: 200
+  screening_counts: {xstest_safe: 12, xstest_unsafe: 12, gsm8k: 8}
+  diagnostic_counts: {xstest_safe: 40, xstest_unsafe: 20, harmbench: 20, gsm8k: 20}
+steering:
+  # Units: fraction of training median residual L2 norm. Sign tuned on validation.
+  alphas: [-0.10, -0.03, 0.03, 0.10]
+  gate_benign_quantile: 0.90
+  max_overrefusal_increase: 0.05
+  max_accuracy_drop: 0.05
+  random_seeds: [11, 22, 33]
+analysis:
+  bootstrap_samples: 2000
+  trace_decode_steps: 4
+budget:
+  target_hours: 6
+  hard_hours: 14
+  safety_factor: 1.5
+  min_free_gib: 40
+output:
+  root: results/safety_runs

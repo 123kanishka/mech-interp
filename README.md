@@ -1,5 +1,14 @@
 # SAE--Jacobian-Lens Comparison
 
+## Separate safety-steering follow-up
+
+The new Qwen3.5-4B intervention suite lives in `src/jlens_safety`, with
+`experiments/run_jlens_safety.py` and `configs/jlens_safety.yaml`.
+Read [its research and GPU execution contract](docs/JLENS_SAFETY.md) first.
+It preserves the completed SAE comparison and writes only to
+`results/safety_runs`. CPU tests do not establish GPU compatibility or safety
+effects; the real preflight must pass before the budgeted full run.
+
 Reproducible MATS mini-project comparing information exposed by sparse
 autoencoders (SAEs), the Jacobian lens (J-Lens), and a language model's actual
 next-token predictions.

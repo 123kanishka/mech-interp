@@ -32,6 +32,7 @@ results/data/*
 !results/data/.gitkeep
 results/runs/*
 !results/runs/.gitkeep
+results/safety_runs/
 
 # Logs
 results/logs/*
