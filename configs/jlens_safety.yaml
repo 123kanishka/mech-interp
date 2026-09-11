@@ -14,7 +14,7 @@ jlens:
   filename: qwen3.5-4b/jlens/Salesforce-wikitext/Qwen3.5-4B_jacobian_lens_n1000.pt
   revision: 6bb49967d3c51a12ccb5beac7146f6f5781f9d06
   intervention_layers: [3, 15, 27]
-  observation_layers: [3, 15, 27, 31]
+  observation_layers: [3, 15, 27, 30]
   dictionary_size: 32
 judge:
   name: allenai/wildguard

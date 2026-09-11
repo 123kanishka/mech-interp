@@ -226,7 +226,7 @@ def fake_generation(prompt, condition):
         response='#### 2', truncated=False, hook_applied=0, hook_calls=1,
         mean_relative_intervention_norm=0, seconds=.1,
         trace=[dict(layer=l, step=0, j_score=float(prompt['harmful']), probe_score=float(prompt['harmful']))
-               for l in (3, 15, 27, 31)])
+               for l in (3, 15, 27, 30)])
 
 
 class SafetyPipelineTests(unittest.TestCase):
@@ -239,13 +239,13 @@ class SafetyPipelineTests(unittest.TestCase):
             def __init__(self, config):
                 self.artifacts = {}
             def extract(self, prompt):
-                return {l: np.array([1., 2., 3., 4.]) for l in (3, 15, 27, 31)}
+                return {l: np.array([1., 2., 3., 4.]) for l in (3, 15, 27, 30)}
             def fit(self, cache, labels):
                 artifact = dict(j_direction=np.array([1., 0, 0, 0]),
                     residual_direction=np.array([1., 0, 0, 0]), logit_direction=np.array([1., 0, 0, 0]),
                     gate_mean=0., gate_scale=1., gate_threshold=1., residual_scale=1.,
                     probe_weight=np.array([1., 0, 0, 0]), probe_bias=0.)
-                return {l: artifact for l in (3, 15, 27, 31)}, {}
+                return {l: artifact for l in (3, 15, 27, 30)}, {}
             def generate(self, prompt, condition):
                 counts['generate'] += 1
                 return dict(response='#### 2', truncated=False, hook_applied=0, hook_calls=1,

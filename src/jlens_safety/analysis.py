@@ -234,6 +234,8 @@ def save_validation_plots(rows, config, run):
 def challenge_report(rows):
     """Descriptive joint outcomes, not an automatic accept/reject hypothesis test."""
     baseline = {r['prompt_id']: r for r in rows if r['condition']['name'] == 'baseline'}
+    final_layer = max((t['layer'] for r in baseline.values() for t in r['trace']
+                       if t['step'] == 0), default=None)
     result = []
     for name in sorted({r['condition']['name'] for r in rows} - {'baseline'}):
         selected = [r for r in rows if r['condition']['name'] == name and r['harmful']]
@@ -244,8 +246,8 @@ def challenge_report(rows):
             changed = r['judgement']['response_harmful']
             improved += original and not changed
             worsened += changed and not original
-            t0 = next((t for t in b['trace'] if t['step'] == 0 and t['layer'] == 31), None)
-            t1 = next((t for t in r['trace'] if t['step'] == 0 and t['layer'] == 31), None)
+            t0 = next((t for t in b['trace'] if t['step'] == 0 and t['layer'] == final_layer), None)
+            t1 = next((t for t in r['trace'] if t['step'] == 0 and t['layer'] == final_layer), None)
             if t0 and t1 and t1['j_score'] < t0['j_score']:
                 suppressed += 1
                 suppressed_unsafe += changed

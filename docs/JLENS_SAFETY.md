@@ -19,7 +19,8 @@ more single-3090 headroom than 9B/27B. A larger model is not needed to test thes
 specific mechanisms. This does not measure safety of hidden thinking-mode chains.
 
 All layers are zero-based **block-output** residual hooks: 3, 15, 27 for
-interventions, plus 31 for observation. No SAE download/training is needed.
+interventions, plus 30 for final available J-lens observation. No SAE
+download/training is needed.
 
 ## Directions and gating
 
