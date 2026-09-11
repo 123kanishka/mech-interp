@@ -87,8 +87,16 @@ def preflight(config, run, prompts, budget, distributed_shards=1):
         selected.extend(sorted(subset, key=lambda r: len(r['prompt']), reverse=True)[:2])
     target = Target(config)
     results, extraction_times = [], []
-    torch.cuda.reset_peak_memory_stats()
+    # FLA compiles/autotunes persistent Triton kernels on the first forward pass.
+    # Warm them before timing so a one-time startup cost is not multiplied by all
+    # 100 training extractions in the remaining-work estimate.
+    warmup_started = time.monotonic()
     try:
+        warmup_row = max(selected, key=lambda row: len(row['prompt']))
+        target.extract(warmup_row['prompt'])
+        target.generate(warmup_row['prompt'], BASELINE, max_new_tokens=8)
+        kernel_warmup_seconds = time.monotonic() - warmup_started
+        torch.cuda.reset_peak_memory_stats()
         for row in selected:
             budget.check()
             t = time.monotonic(); target.extract(row['prompt']); extraction_times.append(time.monotonic()-t)
@@ -136,6 +144,7 @@ def preflight(config, run, prompts, budget, distributed_shards=1):
         distributed_shards=distributed_shards, projected_coordinator_jobs=coordinator_jobs,
         measured_generation_seconds_per_token=seconds_per_token, judge_seconds=judge_seconds,
         target_peak_gib=target_peak/1024**3, judge_peak_gib=judge_peak/1024**3,
+        kernel_warmup_seconds=kernel_warmup_seconds,
         zero_strength_equivalence=True, nonzero_hook_executed=True,
         gpu=torch.cuda.get_device_name(), budget_seconds_already_used=budget.seconds,
         within_budget=(budget.seconds+estimate <= config['budget']['target_hours']*3600),

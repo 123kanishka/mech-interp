@@ -161,6 +161,9 @@ billing cap or a strict wall-clock kill. Idle rented GPU time is still billable.
 Budget stops preserve outputs and never mark SUCCESS. Dataset/direction caches
 and per-example resume avoid duplicate work. Target and judge never occupy GPU
 memory simultaneously. Full-vocabulary readouts occur during fitting only.
+Preflight warms persistent FLA/Triton kernels before measuring throughput and
+records that one-time cost separately as `kernel_warmup_seconds`; multiplying
+compilation time by every planned example would make the forecast meaningless.
 
 ## Running on Vast (after receiving the new connection details)
 
