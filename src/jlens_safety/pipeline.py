@@ -104,7 +104,7 @@ def preflight(config, run, prompts, budget, distributed_shards=1):
         # Actual model alpha=0 equivalence with hooks AND cached greedy generation.
         d = target.wrapper.d_model
         layer = config['jlens']['intervention_layers'][0]
-        target.artifacts = {layer: dict(j_direction=np.ones(d, dtype=np.float32)/np.sqrt(d),
+        target.artifacts = {layer: dict(j_direction=np.full(d, 1.0/np.sqrt(d), dtype=np.float32),
             gate_mean=0.0, gate_scale=1.0, gate_threshold=0.0, residual_scale=1.0,
             probe_weight=np.zeros(d, dtype=np.float32), probe_bias=0.0)}
         zero = dict(name='zero', method='jlens', layer=layer, alpha=0.0, mode='all')
