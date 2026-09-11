@@ -1,4 +1,5 @@
 # Use the CUDA PyTorch already supplied by Vast. No SAE dependency is needed.
 -r requirements.txt
 pyarrow>=14
+flash-linear-attention==0.5.2
 git+https://github.com/anthropics/jacobian-lens.git@581d398613e5602a5af361e1c34d3a92ea82ba8e

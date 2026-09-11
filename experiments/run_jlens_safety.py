@@ -44,7 +44,8 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         identity = dict(config=config, code_sha256=source_hash(ROOT),
             packages={p: importlib.metadata.version(p) for p in ('torch', 'transformers', 'numpy',
-                'scikit-learn', 'huggingface-hub', 'pyarrow', 'pandas', 'matplotlib', 'pyyaml')})
+                'scikit-learn', 'huggingface-hub', 'pyarrow', 'pandas', 'matplotlib', 'pyyaml',
+                'flash-linear-attention', 'fla-core')})
         manifest = run / 'manifest.json'
         if manifest.exists():
             original = json.loads(manifest.read_text())
