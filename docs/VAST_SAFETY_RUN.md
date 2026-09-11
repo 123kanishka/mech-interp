@@ -50,17 +50,15 @@ does not mean each offer supplies two GPUs; the offer cards explicitly say 1×.
 
 ## Runtime scenarios, NOT benchmarks or guarantees
 
-5,904 target responses at up to 192 tokens = 1,133,568 target output tokens.
-With effective target throughput r (including prompt processing), average
-judge time j seconds/response, and assumed two hours for startup/fitting/report:
-
-hours = 1,133,568 / r / 3600 + 5,904 * j / 3600 + 2
+2,484 target responses at up to 192 tokens = 476,928 target output tokens.
+The slower coordinator performs 804 validation and 840 test jobs. Preflight
+measures real target/judge times, applies a 1.5× margin and adds 30 minutes.
 
 | Assumed r | Assumed j | Scenario duration |
 |---:|---:|---:|
-| 40 tokens/s | 2 s | 13.15 h |
-| 20 tokens/s | 4 s | 24.30 h |
-| 10 tokens/s | 6 s | 43.33 h |
+| 40 tokens/s | 2 s | about 5.2 h with margin |
+| 20 tokens/s | 4 s | about 9.9 h with margin |
+| 10 tokens/s | 6 s | about 19.4 h with margin |
 
 These apply equally to the GPU-compute portion of all five offers, NOT as
 different measured per-host predictions. Low RAM, reference-kernel fallbacks,
@@ -91,9 +89,9 @@ starting a run that cannot meet the requested target.
    GPU 1. Copy the frozen, checksum-identical run to GPU 2. Launch --stage
    test-shard --shard-index 0 --shard-count 2 on GPU 1 and index 1 on GPU 2 in
    detached tmux sessions. Each worker generates and then judges its own exact
-   1,800-job shard. This avoids GPU model contention and produces deterministic,
+   840-job shard. This avoids GPU model contention and produces deterministic,
    disjoint coverage. Merge with scripts/merge_safety_shards.py, run --stage
-   report on the coordinator and verify all 3,600 test jobs before SUCCESS.
+   report on the coordinator and verify all 1,680 test jobs before SUCCESS.
    The coordinator sequence before sharding is training extraction → screening
    generation/judging → expanded validation → gated/prefill validation → freeze.
    Qwen and WildGuard load sequentially, never together on the GPU. No manual

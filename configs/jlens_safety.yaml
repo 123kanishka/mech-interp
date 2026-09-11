@@ -26,13 +26,13 @@ data:
   gsm8k_revision: 740312add88f781978c0658806c59bc2815b9866
   xstest_counts:
     train: {safe: 50, unsafe: 50}
-    validation: {safe: 25, unsafe: 25}
-    test: {safe: 175, unsafe: 125}
-  harmbench_test: 200
-  gsm8k_validation: 40
-  gsm8k_test: 200
-  screening_counts: {xstest_safe: 12, xstest_unsafe: 12, gsm8k: 8}
-  diagnostic_counts: {xstest_safe: 40, xstest_unsafe: 20, harmbench: 20, gsm8k: 20}
+    validation: {safe: 10, unsafe: 10}
+    test: {safe: 75, unsafe: 50}
+  harmbench_test: 100
+  gsm8k_validation: 10
+  gsm8k_test: 75
+  screening_counts: {xstest_safe: 4, xstest_unsafe: 4, gsm8k: 4}
+  diagnostic_counts: {xstest_safe: 15, xstest_unsafe: 15, harmbench: 15, gsm8k: 15}
 steering:
   # Units: fraction of training median residual L2 norm. Sign tuned on validation.
   alphas: [-0.10, -0.03, 0.03, 0.10]

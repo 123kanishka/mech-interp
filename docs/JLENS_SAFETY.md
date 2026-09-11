@@ -70,27 +70,26 @@ AUROC is undefined and safety improvement may have a floor effect.
 
 ## Benchmarks and selection
 
-- XSTest: train 50 safe / 50 unsafe, validation 25 / 25, test 175 / 125.
+- XSTest: train 50 safe / 50 unsafe, validation 10 / 10, test 75 / 50.
   Integer allocation preserves whole focus groups while meeting exact counts
   and minimizing category imbalance. No focus crosses partitions.
-- HarmBench: all 200 held-out standard direct text behaviours; contextual and
+- HarmBench: 100 held-out standard direct text behaviours; contextual and
   copyright cases excluded because they need different evaluation handling.
-- GSM8K: 40 validation examples from original train, 200 held-out examples from
+- GSM8K: 10 validation examples from original train, 75 held-out examples from
   original test. Correctness uses explicit `####` numeric answers. This is a
   narrow utility proxy; a short non-thinking cap can depress math performance.
 - Sources, revisions, raw CSV hashes, selected prompt IDs and split hashes are
   frozen in the run directory. Small subsets are **not** full benchmark scores.
 
-Total: 100 training / 90 validation / 700 test, 890 unique prompts. Training
+Total: 100 training / 30 validation / 300 test, 430 unique prompts. Training
 fits directions/probes, not Qwen weights. HarmBench is final-test only.
 
 Screen 3 methods × 3 layers × 4 signed strengths plus baseline on 32 predefined
-validation prompts (12 safe XSTest, 12 unsafe, 8 GSM8K). Expand the winner for
-each method/layer (9 plus baseline) to all 90 validation prompts, reusing the
+validation prompts (4 safe XSTest, 4 unsafe, 4 GSM8K). Expand the winner for
+each method/layer (9 plus baseline) to all 30 validation prompts, reusing the
 screening outputs. Evaluate gated and prefill-only versions of each layer's
-selected J strength on all 90. Compare only fully evaluated candidates, not
-incomplete screening losers against a 90-prompt baseline. The screening heatmap
-uses the same 32 prompts for every candidate.
+selected J strength on all 30. Compare only fully evaluated candidates. The
+screening heatmap uses the same 12 prompts for every candidate.
 Select minimum harmful compliance subject to at most +5 percentage points
 benign over-refusal, at most 5 percentage points math-accuracy loss, and no
 increase in empty outputs relative to baseline. Tie-break on over-refusal,
@@ -100,9 +99,9 @@ are operational filters, not statistical safety guarantees.
 If no candidate passes, keep the best explicitly **infeasible diagnostic**;
 never call it a successful safety setting. Freeze all 12 final conditions before
 any test generation. Four primary conditions (baseline, validation-selected J,
-residual, direct-logit) run on all 700 test prompts. Eight additional conditions
-run on a predefined category-stratified 100-prompt diagnostic subset: 40 safe
-XSTest, 20 unsafe XSTest, 20 HarmBench, 20 GSM8K. Compare all 12 on that SAME
+residual, direct-logit) run on all 300 test prompts. Eight additional conditions
+run on a predefined 60-prompt diagnostic subset: 15 from each dataset/role.
+Compare all 12 on that SAME
 subset in `exploratory/summary.json`; main `summary.json` contains only the four
 complete-test conditions. Diagnostics are exploratory, not equally powered
 headline evidence. The combined condition is a norm-matched mixture of signed
@@ -136,11 +135,11 @@ automated SUCCESS does not mean a human has validated the judge.
 
 ## Compute contract: one RTX 3090, target 10–14 hours or less
 
-Default: 100 training, 90 validation, 700 test prompts.
-Validation: 37×32 + 10×58 + 6×90 = 2,304 generations.
-Test: 4×700 + 8×100 = 3,600 generations.
-Total: **5,904 generations**, capped at 192 new tokens each, plus judging,
-training extraction and preflight. The cap is **1,133,568 target output tokens**,
+Default: 100 training, 30 validation, 300 test prompts.
+Validation: 37×12 + 10×18 + 6×30 = 804 generations.
+Test: 4×300 + 8×60 = 1,680 generations.
+Total: **2,484 generations**, capped at 192 new tokens each, plus judging,
+training extraction and preflight. The cap is **476,928 target output tokens**,
 not a guaranteed runtime. The enlarged suite may exceed 14 hours; the ceiling
 remains unchanged pending throughput measurement and approval of any extension.
 See `VAST_SAFETY_RUN.md` for conditional resource scenarios.

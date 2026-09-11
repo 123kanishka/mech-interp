@@ -63,12 +63,12 @@ class SafetyCoreTests(unittest.TestCase):
         self.assertEqual(jobs['test_conditions'], 12)
         self.assertEqual(len(sweep_conditions(self.config)), 37)
         self.assertEqual(jobs['training_prompts'], 100)
-        self.assertEqual(jobs['validation_prompts'], 90)
-        self.assertEqual(jobs['test_prompts'], 700)
-        self.assertEqual(jobs['validation_generations'], 2304)
-        self.assertEqual(jobs['test_generations'], 3600)
-        self.assertEqual(jobs['generations'], 5904)
-        self.assertEqual(jobs['max_target_generated_tokens'], 1133568)
+        self.assertEqual(jobs['validation_prompts'], 30)
+        self.assertEqual(jobs['test_prompts'], 300)
+        self.assertEqual(jobs['validation_generations'], 804)
+        self.assertEqual(jobs['test_generations'], 1680)
+        self.assertEqual(jobs['generations'], 2484)
+        self.assertEqual(jobs['max_target_generated_tokens'], 476928)
         self.config['budget']['hard_hours'] = 20
         with self.assertRaises(ValueError):
             validate_config(self.config)
@@ -96,7 +96,7 @@ class SafetyCoreTests(unittest.TestCase):
             left = {(name, p) for name, ids in shards[0].items() for p in ids}
             right = {(name, p) for name, ids in shards[1].items() for p in ids}
             self.assertFalse(left & right)
-            self.assertEqual(len(left | right), 3600)
+            self.assertEqual(len(left | right), 1680)
             self.assertLessEqual(abs(len(left)-len(right)), 1)
 
     def test_direction_projection(self):
@@ -185,8 +185,8 @@ class SafetyCoreTests(unittest.TestCase):
         prompts = fixture_prompts(self.config)
         subset = scheduled_subsets(prompts, self.config)
         self.assertEqual(subset, scheduled_subsets(prompts, self.config))
-        self.assertEqual(len(set(subset['screening'])), 32)
-        self.assertEqual(len(set(subset['diagnostic'])), 100)
+        self.assertEqual(len(set(subset['screening'])), 12)
+        self.assertEqual(len(set(subset['diagnostic'])), 60)
         self.assertFalse(set(subset['screening']) & set(subset['diagnostic']))
 
     def test_durable_ids_and_npz(self):
