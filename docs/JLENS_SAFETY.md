@@ -166,10 +166,11 @@ memory simultaneously. Full-vocabulary readouts occur during fitting only.
 
 Use existing CUDA PyTorch; do not reinstall drivers. Install
 `requirements-safety.txt` in the project environment; it omits the old SAE
-dependency and pins Flash Linear Attention so Qwen does not silently use the
-impractically slow reference attention path. The optional `causal-conv1d`
-extension is not required for this inference workload. Preflight requires 40 GiB
-of **free** disk. Pinned Qwen, WildGuard
+dependency and pins Flash Linear Attention and Causal Conv1d so Qwen does not
+silently use impractically slow reference operators. For RTX 3090 workers,
+building the Causal Conv1d wheel only for CUDA compute capability 8.6 is safe and
+substantially faster than compiling unused architectures. Preflight requires 40
+GiB of **free** disk. Pinned Qwen, WildGuard
 and J-lens weights total about 24.22 decimal GB. Plan 50–70 GB including the
 environment, bounded outputs and temporary headroom. A fresh 100 GB container
 is suitable with one shared cache and no duplicated model revisions.

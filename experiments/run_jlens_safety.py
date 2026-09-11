@@ -45,7 +45,7 @@ def main():
         identity = dict(config=config, code_sha256=source_hash(ROOT),
             packages={p: importlib.metadata.version(p) for p in ('torch', 'transformers', 'numpy',
                 'scikit-learn', 'huggingface-hub', 'pyarrow', 'pandas', 'matplotlib', 'pyyaml',
-                'flash-linear-attention', 'fla-core')})
+                'flash-linear-attention', 'fla-core', 'causal-conv1d')})
         manifest = run / 'manifest.json'
         if manifest.exists():
             original = json.loads(manifest.read_text())
