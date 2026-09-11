@@ -419,11 +419,19 @@ def full(config, run, prompts, budget):
     final_report(config, run, prompts)
 
 
-def fit_and_validate(config, run, prompts, budget):
+def fit_and_validate(config, run, prompts, budget, allow_unestimated=False):
     """Sequential coordinator phase; freeze choices before held-out generation."""
-    report = json.loads((run / 'preflight.json').read_text())
-    if not report['within_budget']:
-        raise RuntimeError('Preflight did not approve the projected budget')
+    if allow_unestimated:
+        atomic_json(run / 'preflight_override.json', dict(
+            authorized=True,
+            reason='Operator explicitly requested launch after preflight exceeded seven minutes',
+            consequence='Remaining runtime was not approved by a completed measured preflight',
+            target_hours=config['budget']['target_hours'],
+            hard_hours=config['budget']['hard_hours']))
+    else:
+        report = json.loads((run / 'preflight.json').read_text())
+        if not report['within_budget']:
+            raise RuntimeError('Preflight did not approve the projected budget')
     if not (run / 'directions.json').exists():
         budget.check(); fit(config, run, prompts, budget)
     if (run / 'frozen_test.json').exists():

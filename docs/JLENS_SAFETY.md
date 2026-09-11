@@ -197,6 +197,12 @@ Only proceed when these are acceptable:
   --run-dir results/safety_runs/safety_01 --stage full
 ```
 
+An explicit operator may bypass only the runtime-estimate gate with
+`--stage validate --allow-unestimated-run`. This writes
+`preflight_override.json`; it does not pretend that preflight passed, and it
+does not bypass dataset, manifest, checksum, frozen-selection, shard-completeness,
+or hard-budget checks.
+
 The existing detached-session launcher allows laptop disconnection. Rerun the
 same full command to resume. Never launch two workers in the same directory;
 the OS file lock prevents concurrent appends. Code, configuration and package

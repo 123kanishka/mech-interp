@@ -31,7 +31,11 @@ def main():
         'full', 'report'), required=True)
     parser.add_argument('--shard-index', type=int)
     parser.add_argument('--shard-count', type=int)
+    parser.add_argument('--allow-unestimated-run', action='store_true',
+        help='Explicitly bypass the preflight time gate for validate; records an auditable override')
     args = parser.parse_args()
+    if args.allow_unestimated_run and args.stage != 'validate':
+        parser.error('--allow-unestimated-run is valid only with --stage validate')
     config = yaml.safe_load(args.config.read_text())
     validate_config(config)
     run = args.run_dir.resolve()
@@ -80,7 +84,8 @@ def main():
                 full(config, run, prompts, budget)
                 (run / 'SUCCESS').touch()
             elif args.stage == 'validate':
-                fit_and_validate(config, run, prompts, budget)
+                fit_and_validate(config, run, prompts, budget,
+                    allow_unestimated=args.allow_unestimated_run)
             elif args.stage == 'test-shard':
                 if args.shard_index is None or args.shard_count is None:
                     parser.error('test-shard requires --shard-index and --shard-count')
