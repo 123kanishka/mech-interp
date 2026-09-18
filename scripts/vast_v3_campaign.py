@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Detached two-host campaign. No rental, deletion, or preflight bypass.
+"""Detached two-host campaign with an auditable saved-pilot reuse option.
 
 The coordinator owns a task-specific SSH key. The worker accepts only a small
 stage queue; model work continues even when the laptop or an SSH session ends.
@@ -83,10 +83,12 @@ def main():
     parser.add_argument('--worker-host')
     parser.add_argument('--worker-port',type=int)
     parser.add_argument('--worker-key',type=Path)
+    parser.add_argument('--config',type=Path,default=ROOT/'configs/jlens_safety_learned.yaml')
+    parser.add_argument('--pilot-source',type=Path)
     args=parser.parse_args()
     if Path(args.run_name).name!=args.run_name or args.run_name in ('.','..'):
         parser.error('Run name must be a single directory name')
-    config=yaml.safe_load((ROOT/'configs/jlens_safety_learned.yaml').read_text())
+    config=yaml.safe_load(args.config.read_text())
     if args.role=='prefetch':
         prefetch(config);return
     wait_setup()
@@ -97,7 +99,8 @@ def main():
 
     def execute(stage,index=None):
         command=[sys.executable,str(ROOT/'experiments/run_jlens_safety_learned.py'),
-                 '--run-dir',str(run),'--stage',stage,'--shard-count','2']
+                 '--config',str(args.config),'--run-dir',str(run),'--stage',stage,'--shard-count','2']
+        if stage=='inherit-pilot': command+=['--pilot-source',str(args.pilot_source)]
         if index is not None: command+=['--shard-index',str(index)]
         subprocess.run(command,cwd=ROOT,check=True,timeout=max(1,deadline-time.time()))
 
@@ -117,7 +120,8 @@ def main():
                     atomic_json(control/'worker_status.json',dict(id=previous,stage=stage,status='COMPLETE'))
                     return
                 if stage=='prefetch':
-                    subprocess.run([sys.executable,__file__,'--role','prefetch','--run-name',args.run_name],
+                    subprocess.run([sys.executable,__file__,'--role','prefetch','--run-name',args.run_name,
+                                    '--config',str(args.config)],
                                    check=True,timeout=max(1,deadline-time.time()))
                 elif stage in ('fit-shard','validate-shard','test-shard'):
                     execute(stage,1)
@@ -168,7 +172,8 @@ def main():
     try:
         warm=enqueue('prefetch')
         status(active);execute(active)
-        active='preflight';status(active);execute(active)
+        active='inherit-pilot' if args.pilot_source else 'preflight'
+        status(active);execute(active)
         wait_worker(warm)
         active='screen';status(active);execute(active)
         for active in ('fit-shard','validate-shard','test-shard'):

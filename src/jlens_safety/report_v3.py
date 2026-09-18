@@ -126,7 +126,9 @@ def final_report(c,run,prompts):
     frozen=json.loads((run/'frozen_test.json').read_text())
     primary=[r for r in rows if r['condition']['name'] in frozen['schedule']['primary_conditions']]
     summary=summarise(primary,c)
-    summary['scope']='Fresh v3 run only; baseline + scalar scopes + all registered J-token fitting seeds'
+    summary['scope']='Fresh test generations in a bounded exploratory v3 run; baseline + scalar scopes + all registered J-token fitting seeds'
+    if (run/'preflight.json').exists():
+        summary['development_pilot_audit']=json.loads((run/'preflight.json').read_text())
     summary['harmbench_metric']='WildGuard harmful-response rate; official behavior ASR is separate'
     atomic_json(run/'summary.json',summary)
     factorial=factorial_comparisons(primary,c)
@@ -212,7 +214,8 @@ def final_report(c,run,prompts):
             truncation=float(np.mean([r['truncated'] for r in subset]))))
     atomic_json(run/'claim_readiness.json',dict(computationally_complete=True,
         publication_claims_ready=False,quality_by_corpus=quality,
-        pending=['Blinded human review and judge-agreement audit','Interpret group-level uncertainty and power limits'] +
+        pending=['Blinded human review and judge-agreement audit','Interpret group-level uncertainty and power limits',
+                 'Previously measured development pilot failed informativeness and truncation gates; no fresh preflight by user request'] +
                 ([] if official_enabled else ['Official HarmBench classifier evaluation disabled']),
         benchmark_exposure='Public benchmarks previously examined; results are fresh, not a claim of unseen benchmarks.'))
     export_harmbench(rows,run)

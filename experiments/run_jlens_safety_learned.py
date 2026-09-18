@@ -16,7 +16,8 @@ from jlens_safety.common import Budget, BudgetExceeded, atomic_json, digest, fil
 from jlens_safety.data import validate_rows
 from jlens_safety.data_v3 import prepare
 from jlens_safety.protocol_v3 import (validate_config, workload, preflight, fit_and_validate, full,
-    run_test_shard, screen_and_select, fit_shard, validate_shard, freeze_validated)
+    run_test_shard, screen_and_select, fit_shard, validate_shard, freeze_validated,
+    inherit_development_pilot)
 from jlens_safety.report_v3 import final_report
 from sae_jlens.run_io import read_jsonl
 
@@ -25,7 +26,8 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config',type=Path,default=ROOT/'configs/jlens_safety_learned.yaml')
     parser.add_argument('--run-dir',type=Path,required=True)
-    parser.add_argument('--stage',choices=('prepare','preflight','screen','fit-shard','validate-shard','freeze','validate','test-shard','official-judge','full','report'),required=True)
+    parser.add_argument('--stage',choices=('prepare','inherit-pilot','preflight','screen','fit-shard','validate-shard','freeze','validate','test-shard','official-judge','full','report'),required=True)
+    parser.add_argument('--pilot-source',type=Path)
     parser.add_argument('--shard-index',type=int)
     parser.add_argument('--shard-count',type=int,default=1)
     args=parser.parse_args()
@@ -71,7 +73,11 @@ def main():
             if digest(rows)!=json.loads((run/'data_manifest.json').read_text())['rows_hash']:
                 raise ValueError('Frozen dataset checksum changed')
             atomic_json(run/'workload.json',workload(c,rows))
-            if args.stage=='preflight': preflight(c,run,rows,budget,args.shard_count)
+            if args.stage=='inherit-pilot':
+                if args.pilot_source is None:
+                    parser.error('--pilot-source is required for inherit-pilot')
+                inherit_development_pilot(c,run,rows,args.pilot_source,args.shard_count)
+            elif args.stage=='preflight': preflight(c,run,rows,budget,args.shard_count)
             elif args.stage=='screen': screen_and_select(c,run,rows,budget)
             elif args.stage=='fit-shard': fit_shard(c,run,rows,budget,args.shard_index,args.shard_count)
             elif args.stage=='validate-shard': validate_shard(c,run,rows,budget,args.shard_index,args.shard_count)

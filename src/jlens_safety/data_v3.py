@@ -93,6 +93,28 @@ def select_training(rows, config):
     return selected, dict(excluded)
 
 
+def capped_test_groups(rows, config):
+    """Deterministic, outcome-blind test reduction; never split request groups."""
+    caps = config['data'].get('test_caps')
+    if not caps:
+        return rows
+    groups = {}
+    for row in rows:
+        if row['split'] == 'test':
+            groups.setdefault(row['group'], []).append(row)
+    totals = Counter()
+    chosen = set()
+    for group in sorted(groups, key=lambda key: digest([config['experiment']['seed'], 'test-cap', key])):
+        counts = Counter(f'{r["corpus"]}/{int(r["harmful"])}' for r in groups[group])
+        if any(totals[key] + value > caps.get(key, 0) for key, value in counts.items()):
+            continue
+        chosen.add(group)
+        totals.update(counts)
+    if any(totals[key] < max(1, int(cap * 0.8)) for key, cap in caps.items()):
+        raise ValueError(f'Test caps could not be met by whole groups: {dict(totals)}')
+    return [r for r in rows if r['split'] != 'test' or r['group'] in chosen]
+
+
 def add_harmbench_attacks(behaviors, config):
     path = config['data'].get('harmbench_attack_file')
     mode = config['data'].get('harmbench_attack_mode', 'file')
@@ -195,7 +217,7 @@ def prepare(config, run):
     if too_long:
         raise ValueError(f'Test prompts exceed context cap; increase it in a NEW config: {too_long[:10]}')
     train = [r for r in wj['train'] if r['prompt_token_count'] <= d['max_training_prompt_tokens']]
-    linked = link_request_groups(train + test)
+    linked = capped_test_groups(link_request_groups(train + test), config)
     rows, excluded = select_training(linked, config)
     excluded['training_pool_over_context'] = len(wj['train']) - len(train)
     excluded['malformed_training_rows'] = len(invalid_training_rows)
@@ -206,7 +228,7 @@ def prepare(config, run):
         records = pd.read_parquet(path).to_dict('records')
         indices = list(range(len(records)))
         random.Random(config['experiment']['seed']).shuffle(indices)
-        count = d['gsm8k_validation'] if split == 'validation' else len(records)
+        count = d['gsm8k_validation'] if split == 'validation' else d.get('gsm8k_test', len(records))
         for i in indices[:count]:
             r = records[i]
             rows.append(dict(id=f'gsm-{original}-{i}', group=f'gsm-{original}-{i}',

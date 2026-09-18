@@ -14,7 +14,7 @@ import yaml
 from jlens_safety.core import Intervention, shortlist_tokens
 from jlens_safety.common import atomic_json, atomic_npz, digest, file_hash, rows_by_id, Budget
 from jlens_safety.data import validate_rows
-from jlens_safety.data_v3 import TYPES, wild_rows, link_request_groups, select_training, add_harmbench_attacks
+from jlens_safety.data_v3 import TYPES, wild_rows, link_request_groups, select_training, add_harmbench_attacks, capped_test_groups
 from jlens_safety.learned import (token_intervention, steering_mask, differentiable_hook,
     constrain_coefficients, fit_coefficients, paired_power_plan)
 from jlens_safety.pipeline import BASELINE, job_id, sharded_test_allowed_ids
@@ -33,6 +33,18 @@ def config():
 
 
 class LearnedCoreTests(unittest.TestCase):
+    def test_capped_test_keeps_whole_groups_and_is_deterministic(self):
+        c=config();c['data']['test_caps']={'xstest/0':2,'xstest/1':2}
+        rows=[]
+        for group in range(3):
+            for harmful in (0,1):
+                rows.append(dict(id=f'{group}-{harmful}',group=str(group),split='test',
+                    corpus='xstest',harmful=harmful))
+        first=capped_test_groups(rows,c)
+        self.assertEqual(first,capped_test_groups(list(reversed(rows)),c)[::-1])
+        self.assertEqual(len(first),4)
+        self.assertEqual(len({r['group'] for r in first}),2)
+
     def test_two_gpu_shards_cover_fits_and_validation_exactly_once(self):
         c=config()
         conditions=fitting_conditions(c,15)

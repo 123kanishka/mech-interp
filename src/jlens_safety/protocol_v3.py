@@ -253,8 +253,62 @@ def preflight(c, run, rows, budget, shards=1):
 
 def require_preflight(run):
     report = json.loads((run / 'preflight.json').read_text())
+    if report.get('inherited_development_pilot'):
+        for name, expected in report['pilot_sha256'].items():
+            if file_hash(run / name) != expected:
+                raise ValueError('Inherited development pilot checksum changed: '+name)
+        if not report.get('explicit_no_new_preflight'):
+            raise RuntimeError('Inherited pilot lacks the user-authorized no-new-preflight declaration')
+        return
     if not all(report.get(k) for k in ('within_budget','informative','generation_limit_adequate','backward_and_zero_hooks_passed')):
         raise RuntimeError('A passed measured v3 preflight is required')
+
+
+def inherit_development_pilot(c, run, rows, source, shards=2):
+    """Record an existing failed pilot; this is not a passed preflight."""
+    source = Path(source).resolve()
+    if source == run or not source.is_dir():
+        raise ValueError('Supply a distinct existing pilot run')
+    names = ('preflight_generations.jsonl', 'preflight_judgements.jsonl',
+             'preflight_fit_last.npz', 'preflight_fit_all.npz')
+    for name in names:
+        if not (source / name).is_file():
+            raise ValueError('Missing saved pilot artifact: '+name)
+    generations = rows_by_id(source / names[0])
+    judgements = rows_by_id(source / names[1])
+    if len(generations) != 360 or set(generations) != set(judgements):
+        raise ValueError('Saved pilot is incomplete or labels do not match generations')
+    baseline = [r for r in generations.values() if r['condition']['method'] == 'baseline']
+    harmful = [r for r in baseline if r['harmful']]
+    if len(baseline) != 120 or len(harmful) != 50:
+        raise ValueError('Saved pilot distribution differs from the measured design')
+    failures = sum(bool(judgements[r['id']]['response_harmful']) for r in harmful)
+    truncated = sum(bool(r['generation']['truncated']) for r in baseline)
+    if failures != 2 or truncated != 22:
+        raise ValueError('Saved pilot findings changed; reassess the protocol')
+    for name in names:
+        destination = run / ('inherited_' + name)
+        if destination.exists() and file_hash(destination) != file_hash(source / name):
+            raise ValueError('Existing inherited pilot differs: '+name)
+        if not destination.exists():
+            shutil.copy2(source / name, destination)
+    planned = workload(c, rows)
+    generation_jobs = planned['validation_generations'] + planned['test_generations']
+    mean_generation_seconds = float(np.mean([r['generation']['seconds'] for r in generations.values()]))
+    mean_judge_seconds = float(np.mean([r['seconds'] for r in judgements.values()]))
+    report = dict(inherited_development_pilot=True, explicit_no_new_preflight=True,
+        pilot_sha256={name:file_hash(run / name) for name in ('inherited_' + x for x in names)},
+        source_run_name=source.name, baseline_harmful_responses=failures,
+        harmful_prompts=len(harmful), baseline_truncation=truncated/len(baseline),
+        informative=False, generation_limit_adequate=False, within_budget=False,
+        pilot_calibrated_generation_hours=generation_jobs*mean_generation_seconds/shards/3600,
+        pilot_calibrated_wildguard_hours=generation_jobs*mean_judge_seconds/shards/3600,
+        runtime_estimate_note='Mean saved-pilot time only; fitting, screening serialization, longer 1024-token outputs, downloads, and official judging add time.',
+        note='Previously measured development pilot only. Failed gates are NOT passed or hidden. '
+             'New 14-hour protocol has no fresh preflight; runtime/completion are not guaranteed. '
+             'Do not describe this as a fully powered safety-improvement test.')
+    atomic_json(run / 'preflight.json', report)
+    return report
 
 
 def screen_and_select(c, run, rows, budget):
