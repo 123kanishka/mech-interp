@@ -1,0 +1,88 @@
+# Fresh protocol; never point this runner at an older safety run.
+experiment:
+  name: jlens_signed_tokens_v3
+  schema_version: 3
+  seed: 42
+model:
+  name: Qwen/Qwen3.5-4B
+  revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+  dtype: bfloat16
+  max_prompt_tokens: 8192
+  max_new_tokens: 768
+  enable_thinking: false
+jlens:
+  repo: neuronpedia/jacobian-lens
+  filename: qwen3.5-4b/jlens/Salesforce-wikitext/Qwen3.5-4B_jacobian_lens_n1000.pt
+  revision: 6bb49967d3c51a12ccb5beac7146f6f5781f9d06
+  intervention_layers: [3, 15, 27]
+  observation_layers: [3, 15, 27, 30]
+  dictionary_size: 32
+judge:
+  name: allenai/wildguard
+  revision: cbba4823f3e8020e5a74a5e29bf85072def6f2ff
+  max_new_tokens: 32
+  max_input_tokens: 16384
+official_judge:
+  enabled: true
+  name: cais/HarmBench-Llama-2-13b-cls
+  revision: bda705349d1144fa618770bea64d99ce54e3835b
+  gpu_memory_gib: 20
+  cpu_memory_gib: 16
+data:
+  wildjailbreak_repo: allenai/wildjailbreak
+  wildjailbreak_revision: 5ddc12a7894f842b0619b8e1c7ee496b198af009
+  train_per_type: 2000
+  validation_per_type: 400
+  validation_group_fraction: 0.20
+  xstest_revision: d7bb5bd738c1fcbc36edd83d5e7d1b71a3e2d84d
+  harmbench_revision: 8e1604d1171fe8a48d8febecd22f600e462bdcdd
+  gsm8k_revision: 740312add88f781978c0658806c59bc2815b9866
+  gsm8k_validation: 300
+  max_training_prompt_tokens: 2048
+  # Published HumanJailbreaks random_subset_5 protocol, seed 1.
+  # Optional alternative: mode=file with behavior-ID -> test-case strings JSON.
+  harmbench_attack_mode: published_human_jailbreaks
+  harmbench_attack_seed: 1
+  harmbench_attacks_per_behavior: 5
+  harmbench_attack_file: null
+  harmbench_attack_source: https://github.com/centerforaisafety/HarmBench/blob/8e1604d1171fe8a48d8febecd22f600e462bdcdd/baselines/human_jailbreaks/human_jailbreaks.py
+  require_harmbench_attacks: true
+steering:
+  alphas: [-0.10, -0.03, 0.0, 0.03, 0.10]
+  gate_benign_quantile: 0.90
+  max_overrefusal_increase: 0.02
+  max_accuracy_drop: 0.02
+learning:
+  seeds: [11, 22, 33]
+  methods: [jlens_tokens, logit_tokens, random_tokens]
+  positions: [last, all]
+  epochs: 1
+  accumulation_steps: 8
+  learning_rate: 0.002
+  coefficient_l2: 0.01
+  benign_kl_weight: 0.10
+  max_update_norm: 0.10
+  max_completion_tokens: 256
+  save_every_steps: 25
+analysis:
+  bootstrap_samples: 2000
+  trace_decode_steps: 4
+  pilot_per_type: 25
+  pilot_gsm8k: 20
+  screening_per_type: 40
+  screening_gsm8k: 40
+  diagnostic_per_stratum: 30
+  min_pilot_harmful_responses: 5
+  max_pilot_truncation: 0.10
+  target_absolute_effect: 0.05
+  power: 0.80
+  familywise_alpha: 0.05
+  manual_review_per_stratum: 10
+budget:
+  # A ceiling, not a promise that this much larger protocol fits in 14 hours.
+  target_hours: 14
+  hard_hours: 14
+  safety_factor: 1.5
+  min_free_gib: 40
+output:
+  root: results/safety_runs_v3

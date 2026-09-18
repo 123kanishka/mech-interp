@@ -27,7 +27,11 @@ def main():
             raise ValueError(f'Frozen selection mismatch: {worker}')
         if file_hash(worker / 'prompts.jsonl') != prompts_hash:
             raise ValueError(f'Prompt checksum mismatch: {worker}')
-        for filename in ('test_generations.jsonl', 'test_judgements.jsonl'):
+        if identity['config'].get('experiment', {}).get('schema_version') == 3:
+            for filename in ('directions.npz', 'learned_coefficients.json', 'runtime_environment.json'):
+                if file_hash(worker / filename) != file_hash(coordinator / filename):
+                    raise ValueError(f'Worker artifact/runtime mismatch: {worker}/{filename}')
+        for filename in ('test_generations.jsonl', 'test_judgements.jsonl', 'harmbench_judgements.jsonl'):
             destination = coordinator / filename
             known = rows_by_id(destination)
             for row in rows_by_id(worker / filename).values():

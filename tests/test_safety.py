@@ -285,6 +285,15 @@ class SafetyPipelineTests(unittest.TestCase):
 
     def test_tiny_qwen_hybrid_cached_generation(self):
         from transformers import Qwen3_5TextConfig, Qwen3_5ForCausalLM
+        from transformers.models.qwen3_5 import modeling_qwen3_5 as qwen
+        from unittest.mock import patch
+        import inspect
+        # These tiny fixtures deliberately run on CPU, including on CUDA hosts.
+        # Unwrap optional CUDA-only dispatch; real CUDA is tested by preflight.
+        for name in ('causal_conv1d_fn','causal_conv1d_update',
+                     'torch_chunk_gated_delta_rule','torch_recurrent_gated_delta_rule'):
+            replacement=patch.object(qwen,name,inspect.unwrap(getattr(qwen,name)))
+            replacement.start();self.addCleanup(replacement.stop)
         torch.manual_seed(42)
         cfg = Qwen3_5TextConfig(vocab_size=64, hidden_size=32, intermediate_size=64,
             num_hidden_layers=2, num_attention_heads=2, num_key_value_heads=1, head_dim=16,

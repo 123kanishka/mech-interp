@@ -2,6 +2,14 @@
 
 ## Separate safety-steering follow-up
 
+The approved fresh signed-token experiment uses
+`experiments/run_jlens_safety_learned.py` and
+`configs/jlens_safety_learned.yaml`. Read
+[the new protocol and execution instructions](docs/JLENS_SIGNED_TOKENS.md).
+It learns 32 signed coefficients, compares last-position and all-position
+steering, and writes exclusively to `results/safety_runs_v3/`.
+The older runner/configuration below remain the historical protocol.
+
 The new Qwen3.5-4B intervention suite lives in `src/jlens_safety`, with
 `experiments/run_jlens_safety.py` and `configs/jlens_safety.yaml`.
 Read [its research and GPU execution contract](docs/JLENS_SAFETY.md) first.

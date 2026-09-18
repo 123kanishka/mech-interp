@@ -33,6 +33,10 @@ results/data/*
 results/runs/*
 !results/runs/.gitkeep
 results/safety_runs/
+results/safety_runs_v3/
+results/campaigns/
+results/worker_shards/
+.worker_ed25519*
 
 # Logs
 results/logs/*

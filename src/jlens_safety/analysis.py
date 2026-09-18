@@ -84,13 +84,19 @@ def cluster_interval(values, groups, seed, samples):
     values = np.asarray(values, dtype=float)
     unique = sorted(set(groups))
     # Resample whole clusters, preserving prompt-weighted estimates within each sample.
-    sums = np.array([sum(v for v, g in zip(values, groups) if g == key) for key in unique])
-    counts = np.array([sum(g == key for g in groups) for key in unique])
+    aggregate = {key: [0., 0] for key in unique}
+    for value, group in zip(values, groups):
+        aggregate[group][0] += value
+        aggregate[group][1] += 1
+    sums = np.array([aggregate[key][0] for key in unique])
+    counts = np.array([aggregate[key][1] for key in unique])
     if not len(unique):
         return None
     rng = np.random.default_rng(seed)
-    indices = rng.integers(0, len(unique), size=(samples, len(unique)))
-    bootstrap = sums[indices].sum(1) / counts[indices].sum(1)
+    bootstrap = []
+    for start in range(0, samples, 100):
+        indices = rng.integers(0, len(unique), size=(min(100, samples-start), len(unique)))
+        bootstrap.extend(sums[indices].sum(1) / counts[indices].sum(1))
     return dict(mean=float(values.mean()), low=float(np.quantile(bootstrap, .025)),
                 high=float(np.quantile(bootstrap, .975)), n=len(values), groups=len(unique))
 

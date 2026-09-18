@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from .common import atomic_npz
-from .core import fit_layer, intervention_from_condition
+from .core import fit_layer, intervention_from_condition, shortlist_tokens
 
 
 class Target:
@@ -83,9 +83,8 @@ class Target:
                     for chunk in subset.split(4):
                         total += self.wrapper.unembed(chunk @ J.T).float().sum(0)
                     means.append(total / len(subset))
-                contrast = (means[1] - means[0]).abs()
-                contrast[self.tokenizer.all_special_ids] = -torch.inf
-                ids = contrast.topk(c['dictionary_size']).indices
+                ids, contrast = shortlist_tokens(means[0], means[1],
+                    self.tokenizer.all_special_ids, c['dictionary_size'])
                 U = head[ids].float()
                 # Explicit linear W_U J covectors, not exact derivatives through final RMSNorm.
                 dictionary = (U @ J).cpu().numpy()
@@ -94,13 +93,20 @@ class Target:
                 self.config['experiment']['seed'], self.config['steering']['gate_benign_quantile'])
             metadata[layer] = dict(token_ids=ids.cpu().tolist(),
                 tokens=[self.tokenizer.decode([int(i)]) for i in ids.cpu()],
+                absolute_logit_contrasts=contrast[ids].cpu().tolist(),
+                signed_logit_contrasts=(means[1] - means[0])[ids].cpu().tolist(),
+                selection='Top 32 absolute unsafe-minus-safe TRAIN mean J-lens logits at final prompt position; special IDs excluded',
                 construction='Selected linear W_U J span; signed projection of harmful-safe prompt contrast; not a sparse nonnegative J-space decomposition')
         self.artifacts = artifacts
         return artifacts, metadata
 
     def generate(self, prompt, condition, max_new_tokens=None):
         inputs = self.encode(prompt)
-        intervention = intervention_from_condition(condition, self.artifacts)
+        if condition['method'].endswith('_tokens'):
+            from .learned import token_intervention
+            intervention = token_intervention(condition, self.artifacts)
+        else:
+            intervention = intervention_from_condition(condition, self.artifacts)
         handles, trace, calls = [], [], {}
         limit = self.config['analysis']['trace_decode_steps']
         def make_observer(layer):
@@ -143,6 +149,8 @@ class Target:
             hook_calls=intervention.calls if intervention else 0,
             hook_applied=intervention.applied if intervention else 0,
             gate_on=intervention.gate_on if intervention else None,
+            edited_positions=intervention.edited_positions if intervention else 0,
+            squared_update_norm=intervention.squared_update_norm if intervention else 0.0,
             mean_relative_intervention_norm=(intervention.total_relative_norm / max(1, intervention.applied)
                                               if intervention else 0.0))
 
@@ -193,7 +201,9 @@ class Judge:
     def score(self, prompt, response):
         text = JUDGE_TEMPLATE.format(prompt=prompt, response=response)
         inputs = self.tokenizer(text, add_special_tokens=False, return_tensors='pt').to('cuda')
-        if inputs.input_ids.shape[-1] > 4096:
+        limit = min(self.config['judge'].get('max_input_tokens', 4096),
+                    getattr(self.model.config, 'max_position_embeddings', 4096))
+        if inputs.input_ids.shape[-1] > limit:
             raise ValueError('Judge input too long; refusing silent truncation')
         started = time.monotonic()
         with torch.inference_mode():

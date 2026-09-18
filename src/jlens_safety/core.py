@@ -5,6 +5,17 @@ import numpy as np
 import torch
 
 
+def shortlist_tokens(safe_mean, harmful_mean, special_ids, count=32):
+    """Unchanged rule: absolute training mean J-logit contrast, no special IDs."""
+    if safe_mean.ndim != 1 or safe_mean.shape != harmful_mean.shape:
+        raise ValueError('Token means must be equal-length vocabulary vectors')
+    contrast = (harmful_mean - safe_mean).abs()
+    contrast[list(special_ids)] = -torch.inf
+    if int(torch.isfinite(contrast).sum()) < count:
+        raise ValueError('Fewer eligible vocabulary tokens than dictionary size')
+    return contrast.topk(count).indices, contrast
+
+
 def unit(x):
     x = np.asarray(x, dtype=np.float32)
     norm = np.linalg.norm(x)
@@ -53,6 +64,9 @@ def fit_layer(activations, labels, jlens_dictionary, logit_dictionary, seed, qua
     gate_threshold = float(np.quantile((projection[y == 0] - gate_mean) / gate_scale, quantile))
     probe_weight, probe_bias = linear_probe(x, y, seed)
     return dict(j_direction=j_direction, residual_direction=raw_direction,
+        j_dictionary=np.asarray(jlens_dictionary, dtype=np.float32),
+        logit_dictionary=np.asarray(logit_dictionary, dtype=np.float32),
+        training_delta=delta.astype(np.float32),
         logit_direction=logit_direction, gate_mean=gate_mean, gate_scale=gate_scale,
         gate_threshold=gate_threshold, residual_scale=float(np.median(np.linalg.norm(x, axis=1))),
         probe_weight=probe_weight, probe_bias=probe_bias)
@@ -61,17 +75,22 @@ def fit_layer(activations, labels, jlens_dictionary, logit_dictionary, seed, qua
 class Intervention:
     """One-sequence hook; gate is decided at prefill and frozen for decoding.
 
-    Never changes earlier prompt positions. Tuple outputs are preserved.
+    Position scope is explicit; legacy default changes the last position only.
     The gate reads the unmodified residual, and alpha=0 returns output exactly.
     """
-    def __init__(self, direction, scale, alpha, mode, gate=None):
+    def __init__(self, direction, scale, alpha, mode, gate=None, positions='last',
+                 norm_matching='per_position'):
         if mode not in ('all', 'prefill', 'gated'):
             raise ValueError('Unknown intervention mode')
         self.direction = torch.as_tensor(direction, dtype=torch.float32)
+        if positions not in ('last', 'all') or norm_matching not in ('per_position', 'total'):
+            raise ValueError('Unknown position scope or norm matching')
+        self.positions, self.norm_matching = positions, norm_matching
         self.scale, self.alpha, self.mode = float(scale), float(alpha), mode
         self.gate = gate
         self.calls, self.applied, self.gate_on = 0, 0, None
         self.total_relative_norm = 0.0
+        self.edited_positions, self.squared_update_norm = 0, 0.0
 
     def __call__(self, module, inputs, output):
         h = output if torch.is_tensor(output) else output[0]
@@ -94,9 +113,18 @@ class Intervention:
         if self.direction.device != h.device:
             self.direction = self.direction.to(h.device)
         change = self.direction * (self.alpha * self.scale)
-        self.total_relative_norm += float((change.norm() / h[0, -1].float().norm().clamp_min(1e-9)).item())
+        count = h.shape[1] if self.positions == 'all' else 1
+        if self.norm_matching == 'total':
+            change = change / count ** .5
+        selected = h if self.positions == 'all' else h[:, -1:, :]
+        self.total_relative_norm += float((change.norm() / selected.float().norm(dim=-1).clamp_min(1e-9)).mean().item())
+        self.edited_positions += count
+        self.squared_update_norm += count * float(change.square().sum().item())
         changed = h.clone()
-        changed[:, -1, :] = (h[:, -1, :].float() + change).to(h.dtype)
+        if self.positions == 'all':
+            changed = (changed.float() + change).to(h.dtype)
+        else:
+            changed[:, -1, :] = (h[:, -1, :].float() + change).to(h.dtype)
         self.applied += 1
         return changed if torch.is_tensor(output) else (changed, *output[1:])
 
@@ -121,4 +149,6 @@ def intervention_from_condition(condition, artifacts):
                        'logit': 'logit_direction'}[method]]
     gate = (a['j_direction'], a['gate_mean'], a['gate_scale'], a['gate_threshold'])
     return Intervention(direction, a['residual_scale'], condition['alpha'], condition['mode'],
-                        gate=gate if condition['mode'] == 'gated' else None)
+                        gate=gate if condition['mode'] == 'gated' else None,
+                        positions=condition.get('positions', 'last'),
+                        norm_matching=condition.get('norm_matching', 'per_position'))
