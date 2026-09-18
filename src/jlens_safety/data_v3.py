@@ -102,6 +102,10 @@ def add_harmbench_attacks(behaviors, config):
         with urllib.request.urlopen(url, timeout=60) as response:
             raw = response.read()
         templates = parse_published_templates(raw.decode())
+        # Published Python literals include escaped surrogate pairs. Decode
+        # those to Unicode scalars; fail on unpaired surrogates.
+        templates = [text.encode('utf-16', 'surrogatepass').decode('utf-16')
+                     for text in templates]
         count = config['data']['harmbench_attacks_per_behavior']
         if not 1 <= count <= len(templates):
             raise ValueError('Invalid published attack count')
@@ -214,6 +218,7 @@ def prepare(config, run):
         counts=dict(Counter(f'{r["split"]}/{r["corpus"]}/{r["category"]}' for r in rows)),
         exclusions=excluded, invalid_training_rows=invalid_training_rows,
         attack_source=d.get('harmbench_attack_source'),
+        attack_unicode_normalization='Escaped UTF-16 surrogate pairs decoded; unpaired surrogates rejected',
         deduplication='Normalized exact prompt/base union plus supplied focus groups; semantic overlap may remain',
         prior_exposure='XSTest/HarmBench/GSM8K were previously examined; new generations are not new benchmark holdouts',
         training_pool_source='WildJailbreak train only; official eval is never used to fit or select'))

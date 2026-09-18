@@ -79,6 +79,9 @@ that these counts fit within 14 hours on two RTX 3090s.
 
 ## Data
 
+- Published HarmBench jailbreak strings with escaped UTF-16 surrogate pairs are
+  decoded to the intended Unicode characters before tokenization. The manifest
+  records the normalization; an unpaired surrogate fails preparation.
 - Malformed training-source rows lacking a prompt or reference completion are
   excluded before sampling, with their original IDs and reasons recorded in
   `invalid_training_rows.json` and the data manifest. Requested split sizes stay

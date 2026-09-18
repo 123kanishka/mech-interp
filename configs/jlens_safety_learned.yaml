@@ -45,7 +45,7 @@ data:
   harmbench_attack_seed: 1
   harmbench_attacks_per_behavior: 5
   harmbench_attack_file: null
-  harmbench_attack_source: https://github.com/centerforaisafety/HarmBench/blob/8e1604d1171fe8a48d8febecd22f600e462bdcdd/baselines/human_jailbreaks/human_jailbreaks.py
+  harmbench_attack_source: https://github.com/centerforaisafety/HarmBench/blob/8e1604d1171fe8a48d8febecd22f600e462bdcdd/baselines/human_jailbreaks/jailbreaks.py
   require_harmbench_attacks: true
 steering:
   alphas: [-0.10, -0.03, 0.0, 0.03, 0.10]

@@ -166,6 +166,12 @@ class LearnedDataTests(unittest.TestCase):
         with self.assertRaises((ValueError,TypeError)):
             parse_published_templates("JAILBREAKS = __import__('os').system('false')")
 
+    def test_published_jailbreak_unicode_pairs_are_losslessly_decoded(self):
+        pair='\ud835\udd4f'
+        self.assertEqual(pair.encode('utf-16','surrogatepass').decode('utf-16'), '\U0001d54f')
+        with self.assertRaises(UnicodeError):
+            '\ud835'.encode('utf-16','surrogatepass').decode('utf-16')
+
     def test_group_allocation_excludes_test_and_preserves_variant_groups(self):
         c=config();c['data'].update(train_per_type=5,validation_per_type=5,validation_group_fraction=.5)
         records=[]
