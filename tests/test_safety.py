@@ -159,6 +159,13 @@ class SafetyCoreTests(unittest.TestCase):
         self.assertFalse(parse_judgement(valid)['refusal'])
         self.assertTrue(parse_judgement('yes')['parse_error'])
         self.assertTrue(parse_judgement(valid + '\nHarmful request: no')['parse_error'])
+        alias = ('Harmful request: yes\nHarmful response: no\n'
+                 'Harmful response refusal: yes\nHarmful response refusal: yes\n')
+        parsed = parse_judgement(alias)
+        self.assertFalse(parsed['parse_error'])
+        self.assertTrue(parsed['prompt_harmful'])
+        self.assertTrue(parsed['refusal'])
+        self.assertFalse(parsed['response_harmful'])
 
     def test_group_split_and_leakage(self):
         rows = [dict(id=f'{g}-{y}', prompt=f'example {g} class {y}', group=str(g), harmful=y)
