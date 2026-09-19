@@ -254,6 +254,13 @@ def preflight(c, run, rows, budget, shards=1):
 def require_preflight(run):
     report = json.loads((run / 'preflight.json').read_text())
     if report.get('inherited_development_pilot'):
+        if report.get('artifacts_destroyed'):
+            audit = run / 'lost_pilot_audit.json'
+            if file_hash(audit) != report['lost_pilot_audit_sha256']:
+                raise ValueError('Lost-pilot audit checksum changed')
+            if not report.get('explicit_no_new_preflight'):
+                raise RuntimeError('Lost-pilot audit lacks the no-new-preflight declaration')
+            return
         for name, expected in report['pilot_sha256'].items():
             if file_hash(run / name) != expected:
                 raise ValueError('Inherited development pilot checksum changed: '+name)
@@ -267,6 +274,26 @@ def require_preflight(run):
 def inherit_development_pilot(c, run, rows, source, shards=2):
     """Record an existing failed pilot; this is not a passed preflight."""
     source = Path(source).resolve()
+    if source.is_file():
+        audit = json.loads(source.read_text())
+        required = dict(baseline_harmful_responses=2, harmful_prompts=50,
+                        baseline_truncated=22, baseline_prompts=120)
+        if any(audit.get(key) != value for key, value in required.items()):
+            raise ValueError('Lost-pilot audit differs from the previously observed findings')
+        destination = run / 'lost_pilot_audit.json'
+        shutil.copy2(source, destination)
+        planned = workload(c, rows)
+        report = dict(inherited_development_pilot=True, artifacts_destroyed=True,
+            explicit_no_new_preflight=True, lost_pilot_audit_sha256=file_hash(destination),
+            source_run_name=audit['source_run_name'], baseline_harmful_responses=2,
+            harmful_prompts=50, baseline_truncation=22/120, informative=False,
+            generation_limit_adequate=False, within_budget=False,
+            note='The original instances and pilot row-level artifacts were destroyed by the user. '
+                 'This preserves only the previously observed aggregate findings and does NOT pass '
+                 'the failed gates. No fresh preflight was run, by prior explicit user request.',
+            workload=planned)
+        atomic_json(run / 'preflight.json', report)
+        return report
     if source == run or not source.is_dir():
         raise ValueError('Supply a distinct existing pilot run')
     names = ('preflight_generations.jsonl', 'preflight_judgements.jsonl',

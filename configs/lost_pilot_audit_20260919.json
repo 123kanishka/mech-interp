@@ -1,0 +1,9 @@
+{
+  "source_run_name": "signed_tokens_20260919_two_gpu_r2",
+  "baseline_harmful_responses": 2,
+  "harmful_prompts": 50,
+  "baseline_truncated": 22,
+  "baseline_prompts": 120,
+  "artifact_status": "Original row-level pilot files were destroyed with the prior Vast instances.",
+  "use": "Aggregate development diagnostic only; it does not pass the failed gates or support outcome claims."
+}
