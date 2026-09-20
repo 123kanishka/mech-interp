@@ -34,4 +34,4 @@ echo "Experiment started."
 echo "Session: $SESSION"
 echo "Log:     $LOG"
 echo
-echo "Laptop may now disconnect."
+echo "Detached session started."

@@ -13,10 +13,9 @@ ordinary residual difference steering, direct-unembedding directions, three
 norm-matched random directions, and a norm-matched combined intervention.
 
 Model: `Qwen/Qwen3.5-4B`, dense, BF16, pinned revision, text-only, **non-thinking**
-chat template. The user supplied Neel Nanda's recommendation of dense Qwen3.5
-models. The 4B model reuses the existing compatible J-lens integration and gives
-more single-3090 headroom than 9B/27B. A larger model is not needed to test these
-specific mechanisms. This does not measure safety of hidden thinking-mode chains.
+chat template. The 4B checkpoint has a compatible J-lens and fits on a single
+24 GB GPU with more headroom than the 9B and 27B variants. This does not measure
+safety of hidden thinking-mode chains.
 
 All layers are zero-based **block-output** residual hooks: 3, 15, 27 for
 interventions, plus 30 for final available J-lens observation. No SAE
@@ -116,9 +115,9 @@ time-bounded suite or a silently claimed deliverable.
 WildGuard 7B BF16 runs sequentially after unloading Qwen. Uses its official prompt
 template and separately parses response harmfulness and refusal. No paid API,
 no keyword-refusal substitute, no automatic acceptance of gated model terms.
-You must first obtain access to `allenai/wildguard` using your Hugging Face
-account and provide credentials on the GPU through normal HF login. Do not put
-tokens in the repository. Preflight checks weight access before target loading.
+Access to `allenai/wildguard` must be granted to the Hugging Face account used
+on the GPU. Credentials belong in the normal Hugging Face login, not the
+repository. Preflight checks weight access before target loading.
 Malformed/missing judge output stops selection/completion, never counts as safe.
 
 Headline: harmful compliance, benign over-refusal, math accuracy. Also output
@@ -143,7 +142,7 @@ Total: **2,484 generations**, capped at 192 new tokens each, plus judging,
 training extraction and preflight. The cap is **476,928 target output tokens**,
 not a guaranteed runtime. The enlarged suite may exceed 14 hours; the ceiling
 remains unchanged pending throughput measurement and approval of any extension.
-See `VAST_SAFETY_RUN.md` for conditional resource scenarios.
+Runtime must be measured on the target GPU during preflight.
 
 Preflight measures target generation, activation extraction, and WildGuard
 sequentially. Projects full token-cap runtime using the slowest measured target

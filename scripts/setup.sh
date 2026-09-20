@@ -3,7 +3,6 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Create virtual environment if it does not exist
 if [ ! -d ".venv" ]; then
     python3 -m venv .venv
 fi

@@ -161,9 +161,9 @@ def bootstrap_mean_ci(
     if values.size == 0:
         raise ValueError("cannot bootstrap an empty sample")
     rng = np.random.default_rng(seed)
-    draws = rng.choice(
-        values, size=(int(samples), values.size), replace=True
-    ).mean(axis=1)
+    draws = rng.choice(values, size=(int(samples), values.size), replace=True).mean(
+        axis=1
+    )
     tail = (1.0 - confidence) / 2.0
     return (
         float(values.mean()),

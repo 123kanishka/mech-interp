@@ -79,11 +79,15 @@ def summarise_records(records: list[dict], config: dict) -> dict[str, Any]:
     all_layers_per_sequence: dict[tuple, list[float]] = defaultdict(list)
     for key, values in per_sequence.items():
         corpus, role, control, _layer, sequence_id, metric = key
-        all_layers_per_sequence[(corpus, role, control, sequence_id, metric)].extend(values)
+        all_layers_per_sequence[(corpus, role, control, sequence_id, metric)].extend(
+            values
+        )
     all_layers_grouped: dict[tuple, list[float]] = defaultdict(list)
     for key, values in all_layers_per_sequence.items():
         corpus, role, control, _sequence_id, metric = key
-        all_layers_grouped[(corpus, role, control, metric)].append(float(np.mean(values)))
+        all_layers_grouped[(corpus, role, control, metric)].append(
+            float(np.mean(values))
+        )
     all_layers_rows = []
     offset = len(rows)
     for index, (key, values) in enumerate(sorted(all_layers_grouped.items())):
@@ -171,8 +175,14 @@ def save_plots(summary: dict[str, Any], run_dir: Path) -> list[str]:
             y = [item["mean"] for item in points]
             low = [item["mean"] - item["ci_low"] for item in points]
             high = [item["ci_high"] - item["mean"] for item in points]
-            ax.errorbar(x, y, yerr=[low, high], marker="o", capsize=3,
-                        label=f"{corpus}: {control}")
+            ax.errorbar(
+                x,
+                y,
+                yerr=[low, high],
+                marker="o",
+                capsize=3,
+                label=f"{corpus}: {control}",
+            )
         ax.set_xlabel("Residual-stream layer")
         ax.set_ylabel(ylabel)
         ax.set_title(f"{ylabel} by layer")

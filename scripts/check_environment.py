@@ -33,8 +33,6 @@ for package in packages:
         print(f"✗ {package:<22} {exc}")
 
 if failed:
-    raise SystemExit(
-        "\nEnvironment check failed: " + ", ".join(failed)
-    )
+    raise SystemExit("\nEnvironment check failed: " + ", ".join(failed))
 
 print("\nEnvironment: SUCCESS")

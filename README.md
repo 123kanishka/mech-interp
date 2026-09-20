@@ -1,25 +1,20 @@
-# SAE--Jacobian-Lens Comparison
+# J-Lens Safety Steering
 
-## Separate safety-steering follow-up
+This repository contains two mechanistic-interpretability studies on
+`Qwen/Qwen3.5-4B`:
 
-The approved fresh signed-token experiment uses
-`experiments/run_jlens_safety_learned.py` and
-`configs/jlens_safety_learned.yaml`. Read
-[the new protocol and execution instructions](docs/JLENS_SIGNED_TOKENS.md).
-It learns 32 signed coefficients, compares last-position and all-position
-steering, and writes exclusively to `results/safety_runs_v3/`.
-The older runner/configuration below remain the historical protocol.
+- signed J-Lens token-direction steering for harmful and benign prompts;
+- a matched-layer comparison of SAE feature labels and J-Lens token readouts.
 
-The new Qwen3.5-4B intervention suite lives in `src/jlens_safety`, with
-`experiments/run_jlens_safety.py` and `configs/jlens_safety.yaml`.
-Read [its research and GPU execution contract](docs/JLENS_SAFETY.md) first.
-It preserves the completed SAE comparison and writes only to
-`results/safety_runs`. CPU tests do not establish GPU compatibility or safety
-effects; the real preflight must pass before the budgeted full run.
+The current steering protocol is implemented in `src/jlens_safety` and run by
+`experiments/run_jlens_safety_learned.py` with
+`configs/jlens_safety_learned.yaml`. It learns 32 signed coefficients and
+compares last-position with all-position steering. See
+[`docs/JLENS_SIGNED_TOKENS.md`](docs/JLENS_SIGNED_TOKENS.md) for the protocol.
 
-Reproducible MATS mini-project comparing information exposed by sparse
-autoencoders (SAEs), the Jacobian lens (J-Lens), and a language model's actual
-next-token predictions.
+The earlier scalar-steering protocol remains reproducible through
+`experiments/run_jlens_safety.py`, `configs/jlens_safety.yaml`, and
+[`docs/JLENS_SAFETY.md`](docs/JLENS_SAFETY.md).
 
 ## Research question
 
@@ -37,15 +32,15 @@ The primary model is `Qwen/Qwen3.5-4B`. Public residual-stream SAEs exist only
 at layers 3, 15, and 27, so SAE comparisons are restricted to those matched
 layers. J-Lens and direct-logit-lens baselines can be evaluated at every layer.
 
-## Experimental stages
+## SAE/J-Lens experiment
 
-1. `synthetic`: CPU-only pipeline validation. It checks metrics, controls,
-   serialization, plots, deterministic seeding, and status markers. It is not
-   scientific evidence.
-2. `preflight`: a small real-model GPU run that validates artifact versions,
-   layer conventions, tensor shapes, memory use, and output integrity.
-3. `full`: the preregistered larger dataset run. It writes one JSONL record per
-   evaluated position so partial results survive interruption.
+The SAE/J-Lens comparison uses `experiments/run_sae_jlens.py` and
+`configs/sae_jlens.yaml`. Its stages are:
+
+1. `synthetic`: CPU validation of metrics, controls, serialization, and plots.
+2. `preflight`: a small GPU run that checks artifacts, hook points, shapes,
+   memory, and output integrity.
+3. `full`: the registered dataset run with resumable JSONL output.
 
 Run the local validation without downloading models:
 
@@ -55,17 +50,16 @@ PYTHONPATH=src .venv/bin/python experiments/run_sae_jlens.py \
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The real GPU stages intentionally fail unless their required artifacts and
-dependencies are available. See `docs/EXPERIMENT_DESIGN.md` before running.
+GPU stages require their pinned model, lens, SAE, and dataset artifacts. The
+full design is in [`docs/EXPERIMENT_DESIGN.md`](docs/EXPERIMENT_DESIGN.md).
 
 ## Vast workflow
 
 ```bash
-# From the laptop, using the host and SSH port shown by Vast:
+# Use the host and SSH port shown by Vast.
 ./scripts/provision_vast_from_github.sh \
   VAST_HOST VAST_PORT "$(git rev-parse HEAD)"
 
-# Then add/update the vast-mech SSH alias and connect:
 ssh vast-mech
 cd /workspace/mech-interp
 ./scripts/start_experiment.sh experiments/run_sae_jlens.py \
@@ -74,12 +68,7 @@ cd /workspace/mech-interp
 ./scripts/sync_from_vast.sh
 ```
 
-`provision_vast_from_github.sh` clones the public GitHub repository and checks
-out the exact tested commit. It installs dependencies but deliberately does
-not download model, SAE, J-Lens, or dataset artifacts; those downloads begin
-only when the preflight is launched. Hugging Face artifacts are cached under
-`/workspace/.hf_home`, matching the Vast base image, so duplicate model caches
-are not created.
-
-Do not launch `full` until the preflight output has been inspected and its
-runtime, peak VRAM, disk use, and projected cost have been recorded.
+`provision_vast_from_github.sh` installs an exact pushed commit. Pass an SSH key
+as its fourth argument when the default `~/.ssh/id_ed25519` is not appropriate.
+Model artifacts are downloaded by the experiment stages and cached under
+`/workspace/.hf_home`.

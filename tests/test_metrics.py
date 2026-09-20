@@ -31,9 +31,7 @@ class MetricsTest(unittest.TestCase):
             self.assertLessEqual(result[name], 1.0)
 
     def test_frequency_adjustment_downweights_common_tokens(self):
-        adjusted = frequency_adjust_logits(
-            np.zeros(2), np.array([0.9, 0.1]), alpha=1.0
-        )
+        adjusted = frequency_adjust_logits(np.zeros(2), np.array([0.9, 0.1]), alpha=1.0)
         self.assertLess(adjusted[0], adjusted[1])
 
     def test_invalid_distribution_rejected(self):

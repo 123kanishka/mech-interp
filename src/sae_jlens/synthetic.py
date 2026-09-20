@@ -28,9 +28,7 @@ def generate_records(config: dict[str, Any]) -> list[dict[str, Any]]:
                 original_logits = base @ unembed
                 original_logits[target] += 2.0 * depth
                 noise_scale = 0.8 * (1.0 - depth) + 0.08
-                reconstruction = base + rng.normal(
-                    scale=noise_scale, size=d_model
-                )
+                reconstruction = base + rng.normal(scale=noise_scale, size=d_model)
                 sae_logits = reconstruction @ unembed
                 metrics = compare_distributions(
                     softmax(original_logits),

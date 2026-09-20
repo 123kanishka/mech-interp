@@ -1,8 +1,7 @@
 # Fresh signed-token steering experiment (schema 3)
 
-This implements the approved follow-up. It contains **no new scientific results**
-until the real GPU stages finish. Prior experiments inform design only. The old
-runner, configuration and result directories remain available as historical records.
+This document specifies the schema-3 signed-coefficient protocol. Scientific
+claims must come from completed GPU runs, not from CPU tests or pilot data.
 
 ## What stays fixed
 
@@ -84,7 +83,7 @@ that these counts fit within 14 hours on two RTX 3090s.
   records the normalization; an unpaired surrogate fails preparation.
 - Malformed training-source rows lacking a prompt or reference completion are
   excluded before sampling, with their original IDs and reasons recorded in
-  `invalid_training_rows.json` and the data manifest. Requested split sizes stay
+  `invalid_training_rows.json` and the data manifest. Configured split sizes stay
   unchanged. Malformed test rows still fail preparation; they are never dropped.
 - WildJailbreak train: 2,000 each direct harmful, direct benign, adversarial
   harmful, adversarial benign (8,000 total).
@@ -182,7 +181,7 @@ frozen final-test generation/judging is distributed.
 
 Copy the complete coordinator run directory (including manifest, frozen data,
 directions, coefficients and validation records, **before any test outputs**) to
-each worker with the same code and packages. Then launch disjoint shards in tmux:
+each worker with the same code and packages. Then launch disjoint shards:
 
 ```bash
 # On worker 0:
@@ -194,5 +193,4 @@ each worker with the same code and packages. Then launch disjoint shards in tmux
 Collect worker copies, then use `scripts/merge_safety_shards.py --coordinator ...
 --worker ...` and run the new runner with `--stage report`. Generation and judge
 records must exactly match frozen expected jobs. Keep remote instances until
-local result copies and their checksums have been verified. This code change does
-not itself rent GPUs, push GitHub, or launch remote experiments.
+result copies and their checksums have been verified.

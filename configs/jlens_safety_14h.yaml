@@ -1,5 +1,4 @@
-# Outcome-blind, explicitly exploratory 14-hour two-GPU study.
-# Reuses the saved failed development pilot as an audit, not as a passed gate.
+# Reduced exploratory protocol for a 14-hour two-GPU budget.
 experiment:
   name: jlens_signed_tokens_v3_14h
   schema_version: 3

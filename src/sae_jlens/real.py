@@ -100,7 +100,9 @@ def collect_real_records(
     if prompts_path.exists():
         import json
 
-        prompt_rows = [json.loads(line) for line in prompts_path.read_text().splitlines() if line]
+        prompt_rows = [
+            json.loads(line) for line in prompts_path.read_text().splitlines() if line
+        ]
     else:
         prompt_rows: list[dict[str, Any]] = []
         for corpus_index, corpus in enumerate(config["dataset"]["corpora"]):
@@ -133,7 +135,9 @@ def collect_real_records(
         if row.get("control") != "sae_reconstruction":
             continue
         layer = int(row["layer"])
-        feature_ids[layer].update(int(value) for value in row.get("active_feature_ids", []))
+        feature_ids[layer].update(
+            int(value) for value in row.get("active_feature_ids", [])
+        )
         if "residual_norm" in row:
             residual_norms[layer].append(float(row["residual_norm"]))
     audit_cap = int(config["analysis"]["feature_audit_max_features_per_layer"])
@@ -230,9 +234,9 @@ def _take_tokenizable_texts(
         text = str(item.get(corpus["text_field"], "")).strip()
         if not text:
             continue
-        ids = tokenizer(text, add_special_tokens=True, truncation=True, max_length=max_tokens)[
-            "input_ids"
-        ]
+        ids = tokenizer(
+            text, add_special_tokens=True, truncation=True, max_length=max_tokens
+        )["input_ids"]
         if len(ids) < min_tokens:
             continue
         rows.append(
@@ -245,7 +249,9 @@ def _take_tokenizable_texts(
         )
         if len(rows) >= count:
             return rows
-    raise RuntimeError(f"corpus {corpus['name']} yielded only {len(rows)}/{count} texts")
+    raise RuntimeError(
+        f"corpus {corpus['name']} yielded only {len(rows)}/{count} texts"
+    )
 
 
 def _score_sequence(
@@ -279,11 +285,16 @@ def _score_sequence(
     rng = np.random.default_rng(
         int(config["experiment"]["seed"]) * 1_000_003 + sequence_id
     )
-    positions = sorted(rng.choice(candidate_positions, position_count, replace=False).tolist())
+    positions = sorted(
+        rng.choice(candidate_positions, position_count, replace=False).tolist()
+    )
 
     final_layer = model.n_layers - 1
     record_at = sorted(set(layers) | {final_layer})
-    with torch.inference_mode(), activation_recorder_cls(model.layers, at=record_at) as recorder:
+    with (
+        torch.inference_mode(),
+        activation_recorder_cls(model.layers, at=record_at) as recorder,
+    ):
         model.forward(input_ids)
         activations = {
             layer: recorder.activations[layer][0, positions].float()
@@ -322,7 +333,9 @@ def _score_sequence(
             (residual - reconstruction).square().mean(dim=-1)
             / residual.square().mean(dim=-1).clamp_min(1e-12)
         ).cpu()
-        active_counts = (feature_acts > float(config["sae"]["active_threshold"])).sum(-1).cpu()
+        active_counts = (
+            (feature_acts > float(config["sae"]["active_threshold"])).sum(-1).cpu()
+        )
         residual_norms[layer].extend(residual.norm(dim=-1).detach().cpu().tolist())
         audit_cap = int(config["analysis"]["feature_audit_max_features_per_layer"])
         if len(feature_ids[layer]) < audit_cap:
@@ -334,9 +347,12 @@ def _score_sequence(
                 feature_ids[layer] = set(sorted(feature_ids[layer])[:audit_cap])
 
         for row_index, position in enumerate(positions):
-            future_ids = input_ids[
-                0, position + 1 : position + 1 + future_horizon
-            ].detach().cpu().tolist()
+            future_ids = (
+                input_ids[0, position + 1 : position + 1 + future_horizon]
+                .detach()
+                .cpu()
+                .tolist()
+            )
             target = int(future_ids[0])
             jlens_distribution, jlens_ranked = _truncate_distribution(
                 jlens_probabilities[row_index].numpy(), int(analysis["jlens_top_k"])
@@ -364,7 +380,9 @@ def _score_sequence(
                 "jlens": jlens_distribution,
                 "shuffled_feature_labels_control": shuffled_distribution,
                 "random_feature_labels_control": random_distribution,
-                "sae_reconstruction_control": reconstruction_probabilities[row_index].numpy(),
+                "sae_reconstruction_control": reconstruction_probabilities[
+                    row_index
+                ].numpy(),
                 "model_control": model_probabilities[row_index].numpy(),
             }
             ranked_tokens = {
@@ -457,7 +475,9 @@ def _feature_token_distributions(feature_acts, decoder, model, k: int, vocab_siz
         directions = directions / directions.norm(dim=-1, keepdim=True).clamp_min(1e-12)
         feature_logits = model.unembed(directions).float()
         token_ids = feature_logits.argmax(dim=-1)
-        distribution = torch.zeros(vocab_size, device=token_ids.device, dtype=torch.float32)
+        distribution = torch.zeros(
+            vocab_size, device=token_ids.device, dtype=torch.float32
+        )
         distribution.scatter_add_(0, token_ids, weights)
         distributions.append(distribution.cpu().numpy())
         metadata.append(
@@ -497,7 +517,9 @@ def _audit_feature_tokenizability(
     summary = {}
     for layer, identifiers in feature_ids.items():
         rows = []
-        scale = float(np.median(residual_norms[layer])) if residual_norms[layer] else 1.0
+        scale = (
+            float(np.median(residual_norms[layer])) if residual_norms[layer] else 1.0
+        )
         decoder = saes[layer].W_dec
         for feature_id in sorted(identifiers):
             with torch.inference_mode():
@@ -550,7 +572,9 @@ def _validate_saes(model, saes: dict, layers: list[int]) -> None:
         sae = saes[layer]
         d_in = int(getattr(sae.cfg, "d_in"))
         if d_in != model.d_model:
-            raise ValueError(f"layer {layer} SAE width {d_in} != model width {model.d_model}")
+            raise ValueError(
+                f"layer {layer} SAE width {d_in} != model width {model.d_model}"
+            )
         hook_name = str(getattr(sae.cfg, "hook_name", ""))
         if hook_name and not hook_name.endswith(f"layers.{layer}"):
             raise ValueError(f"layer {layer} SAE hook mismatch: {hook_name}")

@@ -32,9 +32,7 @@ def create_run_dir(root: Path, name: str, stage: str, seed: int) -> Path:
 
 def atomic_json(path: Path, value: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(
-        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, path)
 
 

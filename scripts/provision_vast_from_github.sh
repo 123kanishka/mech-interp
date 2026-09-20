@@ -2,11 +2,11 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 HOST PORT GIT_COMMIT" >&2
-    echo "Example: $0 203.0.113.10 12345 \"\$(git rev-parse HEAD)\"" >&2
+    echo "Usage: $0 HOST PORT GIT_COMMIT [SSH_KEY]" >&2
+    echo "Example: $0 203.0.113.10 12345 \"\$(git rev-parse HEAD)\" ~/.ssh/id_ed25519" >&2
 }
 
-if [[ $# -ne 3 ]]; then
+if [[ $# -lt 3 || $# -gt 4 ]]; then
     usage
     exit 2
 fi
@@ -14,6 +14,7 @@ fi
 HOST="$1"
 PORT="$2"
 GIT_COMMIT="$3"
+SSH_KEY="${4:-${HOME}/.ssh/id_ed25519}"
 
 if [[ ! "$HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
     echo "Invalid host: $HOST" >&2
@@ -41,11 +42,11 @@ fi
 BUNDLE="$(mktemp /tmp/mech-interp-vast.XXXXXX.bundle)"
 trap 'rm -f "$BUNDLE"' EXIT
 git bundle create "$BUNDLE" main
-scp -P "$PORT" -i /home/beluga/.ssh/id_ed25519 \
+scp -P "$PORT" -i "$SSH_KEY" \
     "$BUNDLE" "root@${HOST}:/workspace/mech-interp.bundle"
 
 ssh -p "$PORT" -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \
-    -i /home/beluga/.ssh/id_ed25519 "root@${HOST}" \
+    -i "$SSH_KEY" "root@${HOST}" \
     "GIT_COMMIT='$GIT_COMMIT' bash -s" <<'REMOTE'
 set -euo pipefail
 

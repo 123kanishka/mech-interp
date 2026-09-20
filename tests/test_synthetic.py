@@ -19,11 +19,7 @@ class SyntheticTest(unittest.TestCase):
         self.assertEqual(len(records), 12 * 8 * 3)
         means = {}
         for layer in self.config["sae"]["layers"]:
-            values = [
-                row["js_similarity"]
-                for row in records
-                if row["layer"] == layer
-            ]
+            values = [row["js_similarity"] for row in records if row["layer"] == layer]
             means[layer] = sum(values) / len(values)
         self.assertGreater(means[27], means[3])
 
